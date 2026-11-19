@@ -16,7 +16,7 @@ import { STATUS_LABEL, STATUSES, type ItemStatus } from '../lib/types'
 const PAGE = 100
 
 export default function Items() {
-  const { items, products, refresh } = useData()
+  const { items, products, refreshItems } = useData()
   const { api, member } = useAuth()
   const toast = useToast()
   const [params, setParams] = useSearchParams()
@@ -90,7 +90,7 @@ export default function Items() {
       const n = await api.setItemsStatus(ids, status)
       toast.ok(`${plural(n, 'item')} marked ${STATUS_LABEL[status]}${skipped ? ` · ${skipped} already handed over, left as is` : ''}`)
       setSelected(new Set())
-      await refresh()
+      await refreshItems(ids)
     } catch (e) {
       toast.err(friendlyError(e))
     } finally {

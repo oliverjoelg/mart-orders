@@ -22,7 +22,7 @@ interface Student {
 const norm = (s: string) => s.toUpperCase().replace(/\s+/g, '')
 
 export default function Handover() {
-  const { items, notesByBuyer, memberName, refresh } = useData()
+  const { items, notesByBuyer, memberName, refresh, refreshItems } = useData()
   const { api, member } = useAuth()
   const toast = useToast()
   const [q, setQ] = useState('')
@@ -302,10 +302,11 @@ export default function Handover() {
           items={chosenItems}
           onClose={() => setConfirm(false)}
           onDone={async (message) => {
+            const ids = chosenItems.map((i) => i.id)
             setConfirm(false)
             setDone(message)
             reset()
-            await refresh()
+            await refreshItems(ids)
           }}
         />
       )}
@@ -314,8 +315,9 @@ export default function Handover() {
           item={undoItem}
           onClose={() => setUndoItem(null)}
           onDone={() => {
+            const id = undoItem.id
             setUndoItem(null)
-            void refresh()
+            void refreshItems([id])
           }}
         />
       )}

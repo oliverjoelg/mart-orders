@@ -1,10 +1,11 @@
-import { Lock, Plus, Unlock } from 'lucide-react'
+import { DatabaseBackup, Lock, Plus, Unlock } from 'lucide-react'
 import { useState } from 'react'
 import { useToast } from '../components/Toast'
 import { Modal, PageHead, ProductLabel } from '../components/ui'
 import { friendlyError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { inr } from '../lib/format'
+import { downloadXlsx } from '../lib/import/readFile'
 import { can, isSuperRole } from '../lib/permissions'
 import { useData } from '../lib/store'
 import type { Product } from '../lib/types'
@@ -91,6 +92,8 @@ export default function Products() {
             ))}
           </div>
         </div>
+
+        {superAdmin && <BackupCard />}
 
         <div className="card">
           <div className="card-head"><h3>Sales rounds</h3></div>
@@ -269,5 +272,45 @@ function ProductModal({
         <span className="hint">Matched against the form's colour answer, e.g. “Classic MDI Batch T-Shirt Blue (Rs 699/-)”.</span>
       </div>
     </Modal>
+  )
+}
+
+/** Super admin: download every table (all rounds, change log included) as one Excel file. */
+function BackupCard() {
+  const { api } = useAuth()
+  const toast = useToast()
+  const [busy, setBusy] = useState(false)
+  const run = async () => {
+    setBusy(true)
+    try {
+      const all = await api.exportAll()
+      const sheets = Object.entries(all).map(([name, rows]) => {
+        const keys = [...new Set(rows.flatMap((r) => Object.keys(r)))]
+        const cell = (v: unknown) => (v === null || v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v))
+        return { name, rows: [keys, ...rows.map((r) => keys.map((k) => cell(r[k])))] }
+      })
+      const stamp = new Date().toISOString().slice(0, 10)
+      await downloadXlsx(`MART Orders backup ${stamp}.xlsx`, sheets)
+      const total = Object.values(all).reduce((n, r) => n + r.length, 0)
+      toast.ok(`Backup downloaded: ${total.toLocaleString('en-IN')} rows. Put it in the MART Google Drive.`)
+    } catch (e) {
+      toast.err(friendlyError(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="card card-pad row between">
+      <div style={{ maxWidth: 560 }}>
+        <b style={{ fontWeight: 600 }}>Backup</b>
+        <div className="hint">
+          The free database has no automatic backups. Once a month, download everything (all rounds, students, the change log)
+          and keep it in the MART Google Drive. It contains student contact details: never put it on GitHub or a personal drive.
+        </div>
+      </div>
+      <button className="btn" disabled={busy} onClick={() => void run()}>
+        <DatabaseBackup size={15} /> {busy ? 'Preparing…' : 'Download full backup'}
+      </button>
+    </div>
   )
 }

@@ -3,7 +3,7 @@
  * whole app (and switch roles) without a Supabase project or Google sign-in. Nothing is saved.
  * It mimics the database rules loosely; the real enforcement is in the SQL migrations.
  */
-import type { Api, ImportArgs, Snapshot } from './api'
+import { pickCampaign, type Api, type ImportArgs, type Snapshot } from './api'
 import { can, isSuperRole, type PermissionRow, type RolePermissionRow, type RoleRow } from './permissions'
 
 // Same defaults as migration 20261119120800 (the real list lives in the database).
@@ -189,6 +189,7 @@ function build(): { db: Snapshot; log: AuditEntry[] } {
     db: {
       campaigns: [campaign], products, buyers, items, handovers, notes, spare, members: DEMO_MEMBERS,
       roles: structuredClone(DEMO_ROLES), permissions: DEMO_PERMISSIONS, rolePermissions: structuredClone(DEMO_ROLE_PERMS),
+      campaignId: null as string | null,
     },
     log,
   }
@@ -275,17 +276,48 @@ export function createDemoApi(): Api {
       listeners.forEach((l) => l())
     },
 
-    async loadSnapshot() {
+    async loadSnapshot(campaignId) {
       await delay(200)
       // like the database: locked rounds are invisible to anyone but super admins
       const hidden = new Set(isSuperRole(role) ? [] : db.campaigns.filter((c) => c.locked).map((c) => c.id))
+      const campaigns = db.campaigns.filter((c) => !hidden.has(c.id))
+      const cid = pickCampaign(campaigns, campaignId)
+      // like the real backend: only one round's items are loaded
+      const items = db.items.filter((i) => i.campaign_id === cid)
+      const itemIds = new Set(items.map((i) => i.id))
+      const buyerIds = new Set(items.map((i) => i.buyer_id))
       return clone({
         ...db,
-        campaigns: db.campaigns.filter((c) => !hidden.has(c.id)),
+        campaigns,
         products: db.products.filter((p) => !hidden.has(p.campaign_id)),
-        items: db.items.filter((i) => !hidden.has(i.campaign_id)),
-        handovers: db.handovers.filter((h) => !h.undone_at),
+        items,
+        buyers: db.buyers.filter((b) => buyerIds.has(b.id)),
+        handovers: db.handovers.filter((h) => !h.undone_at && itemIds.has(h.item_id)),
+        campaignId: cid,
       })
+    },
+
+    async loadItems(ids) {
+      await delay(60)
+      const set = new Set(ids)
+      return clone({
+        items: db.items.filter((i) => set.has(i.id)),
+        handovers: db.handovers.filter((h) => !h.undone_at && set.has(h.item_id)),
+      })
+    },
+
+    async findBuyer(rollNo) {
+      await delay(60)
+      return clone(db.buyers.find((b) => b.roll_no === rollNo) ?? null)
+    },
+
+    async exportAll() {
+      await delay(300)
+      return clone({
+        campaigns: db.campaigns, products: db.products, buyers: db.buyers, order_items: db.items, handovers: db.handovers,
+        notes: db.notes, spare_stock: db.spare, members: db.members, roles: db.roles, role_permissions: db.rolePermissions,
+        audit_log: log,
+      }) as unknown as Record<string, Record<string, unknown>[]>
     },
 
     async setItemsStatus(ids, status) {

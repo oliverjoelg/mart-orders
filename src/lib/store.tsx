@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { friendlyError, type Snapshot } from './api'
 import { useAuth } from './auth'
 import { setPermissionData } from './permissions'
@@ -20,6 +20,8 @@ interface DataState {
   memberName(userId: string | null | undefined): string
   membersByUserId: Map<string, Member>
   refresh(): Promise<void>
+  /** fetch just these items again (cheap; use after a handover, receive, status change) */
+  refreshItems(ids: string[]): Promise<void>
   lastLoaded: number
 }
 
@@ -41,11 +43,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [campaignId, setCampaignIdState] = useState<string | null>(() => readStored(CAMPAIGN_KEY))
   const [lastLoaded, setLastLoaded] = useState(0)
+  const campaignIdRef = useRef<string | null>(campaignId)
+  campaignIdRef.current = campaignId
 
   const refresh = useCallback(async () => {
     try {
       setError(null)
-      const s = await api.loadSnapshot()
+      const s = await api.loadSnapshot(campaignIdRef.current)
       setSnapshot(s)
       setLastLoaded(Date.now())
     } catch (e) {
@@ -74,7 +78,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const campaigns = [...(snapshot?.campaigns ?? [])].sort(
       (a, b) => Number(!!a.locked) - Number(!!b.locked) || Number(b.is_active) - Number(a.is_active) || (b.created_at ?? '').localeCompare(a.created_at ?? ''),
     )
-    const campaign = campaigns.find((c) => c.id === campaignId) ?? campaigns[0] ?? null
+    const campaign = campaigns.find((c) => c.id === snapshot?.campaignId) ?? null
     const buyersById = new Map((snapshot?.buyers ?? []).map((b) => [b.id, b]))
     const productsById = new Map((snapshot?.products ?? []).map((p) => [p.id, p]))
     const handoverByItem = new Map((snapshot?.handovers ?? []).map((h) => [h.item_id, h]))
@@ -107,6 +111,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       campaign,
       setCampaignId(id) {
         setCampaignIdState(id)
+        campaignIdRef.current = id
+        setLoading(true)
+        void refresh()
         try {
           localStorage.setItem(CAMPAIGN_KEY, id)
         } catch {
@@ -123,6 +130,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return m ? memberLabel(m) : 'Unknown member'
       },
       refresh,
+      async refreshItems(ids) {
+        if (ids.length === 0) return
+        try {
+          const fresh = await api.loadItems(ids)
+          const gone = new Set(ids)
+          setSnapshot((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  items: [...prev.items.filter((i) => !gone.has(i.id)), ...fresh.items],
+                  handovers: [...prev.handovers.filter((h) => !gone.has(h.item_id)), ...fresh.handovers],
+                }
+              : prev,
+          )
+        } catch {
+          await refresh()
+        }
+      },
       lastLoaded,
     }
   }, [snapshot, loading, error, campaignId, refresh, lastLoaded])

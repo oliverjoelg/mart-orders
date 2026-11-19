@@ -1,7 +1,9 @@
 import type { PostgrestError } from '@supabase/supabase-js'
-import type { ActivityQuery, Api, AuthUser, ImportArgs, Snapshot } from './api'
+import { pickCampaign, type ActivityQuery, type Api, type AuthUser, type ImportArgs, type Snapshot } from './api'
 import { getSupabase } from './supabase'
-import type { AuditEntry, Member } from './types'
+import type { AuditEntry, Buyer, Handover, Member, OrderItem } from './types'
+
+
 
 const PAGE = 1000 // Supabase returns at most 1000 rows per request
 
@@ -10,12 +12,18 @@ function check<T>(res: { data: T; error: PostgrestError | null }): T {
   return res.data
 }
 
-async function fetchAll<T>(table: string, whereNull?: string, orderBy = 'id'): Promise<T[]> {
+interface FetchOpts {
+  select?: string
+  eq?: [string, string][]
+}
+
+async function fetchAll<T>(table: string, whereNull?: string, orderBy = 'id', opts: FetchOpts = {}): Promise<T[]> {
   const sb = getSupabase()
   const out: T[] = []
   for (let from = 0; ; from += PAGE) {
-    let q = sb.from(table).select('*')
+    let q = sb.from(table).select(opts.select ?? '*')
     if (whereNull) q = q.is(whereNull, null)
+    for (const [col, val] of opts.eq ?? []) q = q.eq(col, val)
     const res = await q.order(orderBy, { ascending: true }).range(from, from + PAGE - 1)
     const rows = check(res) as T[]
     out.push(...rows)
@@ -60,21 +68,71 @@ export function createSupabaseApi(): Api {
       return check(res) as Member | null
     },
 
-    async loadSnapshot(): Promise<Snapshot> {
-      const [campaigns, products, buyers, items, handovers, notes, spare, members, roles, permissions, rolePermissions] = await Promise.all([
+    async loadSnapshot(campaignId?: string | null): Promise<Snapshot> {
+      // small shared tables first, to know which round to load
+      const [campaigns, products, spare, members, roles, permissions, rolePermissions] = await Promise.all([
         fetchAll<Snapshot['campaigns'][number]>('campaigns'),
         fetchAll<Snapshot['products'][number]>('products'),
-        fetchAll<Snapshot['buyers'][number]>('buyers'),
-        fetchAll<Snapshot['items'][number]>('order_items'),
-        fetchAll<Snapshot['handovers'][number]>('handovers', 'undone_at'),
-        fetchAll<Snapshot['notes'][number]>('notes'),
         fetchAll<Snapshot['spare'][number]>('spare_stock'),
         fetchAll<Snapshot['members'][number]>('members'),
         fetchAll<Snapshot['roles'][number]>('roles', undefined, 'sort_order'),
         fetchAll<Snapshot['permissions'][number]>('permissions', undefined, 'sort_order'),
         fetchAll<Snapshot['rolePermissions'][number]>('role_permissions', undefined, 'role_key'),
       ])
-      return { campaigns, products, buyers, items, handovers, notes, spare, members, roles, permissions, rolePermissions }
+      const cid = pickCampaign(campaigns, campaignId)
+      if (!cid) {
+        return { campaigns, products, spare, members, roles, permissions, rolePermissions, buyers: [], items: [], handovers: [], notes: [], campaignId: null }
+      }
+      // only this round's items, the students who ordered in it, and its live handovers
+      const strip = <T,>(rows: (T & { order_items?: unknown })[]) =>
+        rows.map((r) => {
+          const copy = { ...r }
+          delete copy.order_items
+          return copy as T
+        })
+      const [items, buyers, handovers, notes] = await Promise.all([
+        fetchAll<Snapshot['items'][number]>('order_items', undefined, 'id', { eq: [['campaign_id', cid]] }),
+        fetchAll<Snapshot['buyers'][number] & { order_items?: unknown }>('buyers', undefined, 'id', {
+          select: '*, order_items!inner(campaign_id)',
+          eq: [['order_items.campaign_id', cid]],
+        }).then((r) => strip<Snapshot['buyers'][number]>(r)),
+        fetchAll<Snapshot['handovers'][number] & { order_items?: unknown }>('handovers', 'undone_at', 'id', {
+          select: '*, order_items!inner(campaign_id)',
+          eq: [['order_items.campaign_id', cid]],
+        }).then((r) => strip<Snapshot['handovers'][number]>(r)),
+        fetchAll<Snapshot['notes'][number]>('notes'),
+      ])
+      return { campaigns, products, buyers, items, handovers, notes, spare, members, roles, permissions, rolePermissions, campaignId: cid }
+    },
+
+    async loadItems(ids) {
+      const items: OrderItem[] = []
+      const handovers: Handover[] = []
+      for (let i = 0; i < ids.length; i += 100) {
+        const chunk = ids.slice(i, i + 100)
+        const [it, ho] = await Promise.all([
+          sb.from('order_items').select('*').in('id', chunk),
+          sb.from('handovers').select('*').in('item_id', chunk).is('undone_at', null),
+        ])
+        items.push(...(check(it) as OrderItem[]))
+        handovers.push(...(check(ho) as Handover[]))
+      }
+      return { items, handovers }
+    },
+
+    async findBuyer(rollNo) {
+      return check(await sb.from('buyers').select('*').eq('roll_no', rollNo).maybeSingle()) as Buyer | null
+    },
+
+    async exportAll() {
+      const tables: [string, string][] = [
+        ['campaigns', 'id'], ['products', 'id'], ['buyers', 'id'], ['order_items', 'id'], ['handovers', 'id'],
+        ['notes', 'id'], ['spare_stock', 'id'], ['imports', 'id'], ['members', 'id'], ['roles', 'sort_order'],
+        ['role_permissions', 'role_key'], ['audit_log', 'id'],
+      ]
+      const out: Record<string, Record<string, unknown>[]> = {}
+      for (const [t, order] of tables) out[t] = await fetchAll<Record<string, unknown>>(t, undefined, order)
+      return out
     },
 
     async setItemsStatus(ids, status) {

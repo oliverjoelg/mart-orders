@@ -52,7 +52,7 @@ function vendorText(groups: Group[]): string {
 }
 
 export default function PrintList() {
-  const { items, products, refresh } = useData()
+  const { items, products, refreshItems } = useData()
   const { api, member } = useAuth()
   const toast = useToast()
   const [scope, setScope] = useState<Scope>('ordered')
@@ -125,11 +125,12 @@ export default function PrintList() {
   const markSent = async () => {
     setBusy(true)
     try {
-      const n = await api.setItemsStatus(toSend.map((i) => i.id), 'sent_to_vendor')
+      const ids = toSend.map((i) => i.id)
+      const n = await api.setItemsStatus(ids, 'sent_to_vendor')
       toast.ok(`${plural(n, 'item')} marked as sent to the vendor`)
       setConfirm(false)
       setPicked(new Set())
-      await refresh()
+      await refreshItems(ids)
     } catch (e) {
       toast.err(friendlyError(e))
     } finally {
