@@ -22,7 +22,7 @@ interface Student {
 const norm = (s: string) => s.toUpperCase().replace(/\s+/g, '')
 
 export default function Handover() {
-  const { items, notesByBuyer, memberName, refresh, refreshItems } = useData()
+  const { items, notesByBuyer, memberName, refreshItems, putNotes } = useData()
   const { api, member } = useAuth()
   const toast = useToast()
   const [q, setQ] = useState('')
@@ -206,8 +206,7 @@ export default function Handover() {
                     className="btn btn-sm"
                     onClick={async () => {
                       try {
-                        await api.setNoteResolved(n.id, true)
-                        await refresh()
+                        putNotes([await api.setNoteResolved(n.id, true)])
                       } catch (e) {
                         toast.err(friendlyError(e))
                       }

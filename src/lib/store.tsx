@@ -22,6 +22,8 @@ interface DataState {
   refresh(): Promise<void>
   /** fetch just these items again (cheap; use after a handover, receive, status change) */
   refreshItems(ids: string[]): Promise<void>
+  /** put saved notes straight into the loaded data (no reload) */
+  putNotes(notes: Note[]): void
   lastLoaded: number
 }
 
@@ -147,6 +149,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         } catch {
           await refresh()
         }
+      },
+      putNotes(notes) {
+        const ids = new Set(notes.map((n) => n.id))
+        setSnapshot((prev) => (prev ? { ...prev, notes: [...prev.notes.filter((n) => !ids.has(n.id)), ...notes] } : prev))
       },
       lastLoaded,
     }
