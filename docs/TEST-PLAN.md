@@ -9,7 +9,7 @@ Use a throwaway sales round so real data stays clean:
 **Products → New sales round → "TEST – delete me"**, add one product (e.g. Navy, keywords `navy, blue`).
 Audit entries for the test stay in the log by design (it is append-only).
 
-People needed: George (super admin) + one test Admin + one test Ops (real @mdi.ac.in accounts,
+People needed: Oliver (super admin) + one test Admin + one test Ops (real @mdi.ac.in accounts,
 added on Team & roles). Devices: one Android phone (Chrome), one laptop.
 
 ## A. Sign-in and roles
@@ -18,10 +18,10 @@ added on Team & roles). Devices: one Android phone (Chrome), one laptop.
 | A1 | Sign in with an @mdi.ac.in account that is NOT on the team | Refused: "not on the MART team list" | `select count(*) from auth.users where email = '<that email>'` → 0 |
 | A2 | Sign in with a personal Gmail | Refused | same → 0 |
 | A3 | Open the link from WhatsApp | Yellow "Open in Chrome" note on the login page | — |
-| A4 | George adds test Admin + test Ops on Team & roles | They can sign in; their name shows | `select email, role, user_id is not null from members` |
+| A4 | Oliver adds test Admin + test Ops on Team & roles | They can sign in; their name shows | `select email, role, user_id is not null from members` |
 | A5 | Ops: look for Team & roles / Import CSV | Not in the menu; typing `#/team` goes to Overview | — |
 | A6 | Admin: try to make someone Super admin | Option not offered | — |
-| A7 | Admin: look at George's row | No Edit button | — |
+| A7 | Admin: look at Oliver's row | No Edit button | — |
 
 ## B. Import
 | # | Do | Expect | DB check |
@@ -80,14 +80,14 @@ edit anything but status, or write the log; no handover before arrival, no doubl
 undo needs a reason, admin undo restores "In MART"; 6 audit rows per item with the right names; audit log append-only
 (even for the owner); admin cannot create a super admin; product with orders cannot be deleted.
 
-**App flows on the live site as George (super admin), in round "TEST – delete me":** all passed and matched the database.
+**App flows on the live site as Oliver (super admin), in round "TEST – delete me":** all passed and matched the database.
 - Products: new round + product (B-equivalent).
 - Add orders → One order by hand: TEST-001 (2 items), TEST-002 (1 item).
 - Receive stock: ticked M and S only → "2 Grey items marked as arrived".
 - Exports: Ready to collect = TEST-002 only; with the partly-ready toggle = both (TEST-001 "1 still with vendor"); Not arrived = TEST-001 L. (D1, D4)
 - Handover desk: single item → no checkbox, one tap "<name> is taking it" (C2); friend handover saved roll in capitals (C3); search cleared after each.
 - Undo as super admin: button disabled until a reason is typed; item back to In MART (C6).
-- Activity: every step listed in plain words with George's name and the undo reason (E1); DB cross-check matched.
+- Activity: every step listed in plain words with Oliver's name and the undo reason (E1); DB cross-check matched.
 - Round closed afterwards (data kept; audit log is append-only by design).
 
 **Not yet run (needs people / devices):** A3 WhatsApp link, A4–A7 with real Admin/Ops accounts, C4/C5/C7 on two phones,

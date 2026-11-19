@@ -1,4 +1,4 @@
-# Setup (one time, George)
+# Setup (one time, Oliver)
 
 These steps need account access, so the code does not do them. Do them in this order.
 
