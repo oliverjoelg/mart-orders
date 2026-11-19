@@ -22,12 +22,13 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { can, type Action } from '../lib/permissions'
 import { useData } from '../lib/store'
+import { PAGE_HINTS, type HintPath } from '../lib/hints'
 import { allRoles } from '../lib/permissions'
 import { memberLabel, type Role } from '../lib/types'
 import { Avatar, Modal, RoleBadge } from './ui'
 
 interface NavItem {
-  to: string
+  to: HintPath
   label: string
   short?: string
   icon: LucideIcon
@@ -96,7 +97,7 @@ function CampaignSelect() {
       {campaigns.length === 0 ? (
         <Link to="/products" className="btn btn-sm">Create a sales round</Link>
       ) : (
-        <select id="round-select" className="select" value={campaign?.id ?? ''} onChange={(e) => setCampaignId(e.target.value)}>
+        <select id="round-select" className="select" title="Which sales round every page is showing" value={campaign?.id ?? ''} onChange={(e) => setCampaignId(e.target.value)}>
           {campaigns.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -177,7 +178,7 @@ export function Layout({ children }: { children: ReactNode }) {
               {items
                 .filter((i) => i.group === g)
                 .map((i) => (
-                  <NavLink key={i.to} to={i.to} end={i.to === '/'} className="nav-link">
+                  <NavLink key={i.to} to={i.to} end={i.to === '/'} className="nav-link" title={PAGE_HINTS[i.to]}>
                     <i.icon size={16} strokeWidth={1.8} />
                     {i.label}
                   </NavLink>
@@ -233,7 +234,7 @@ export function Layout({ children }: { children: ReactNode }) {
         {BOTTOM.map((to) => {
           const n = NAV.find((x) => x.to === to)!
           return (
-            <NavLink key={to} to={to} end={to === '/'}>
+            <NavLink key={to} to={to} end={to === '/'} title={PAGE_HINTS[n.to]}>
               <n.icon size={20} strokeWidth={1.8} />
               {n.short ?? n.label}
             </NavLink>
@@ -253,9 +254,12 @@ export function Layout({ children }: { children: ReactNode }) {
               {items
                 .filter((i) => !BOTTOM.includes(i.to))
                 .map((i) => (
-                  <NavLink key={i.to} to={i.to} end={i.to === '/'} className="nav-link" style={{ height: 44 }}>
+                  <NavLink key={i.to} to={i.to} end={i.to === '/'} className="nav-link nav-link-2line">
                     <i.icon size={18} strokeWidth={1.8} />
-                    {i.label}
+                    <span className="nav-text">
+                      {i.label}
+                      <small>{PAGE_HINTS[i.to]}</small>
+                    </span>
                   </NavLink>
                 ))}
             </nav>

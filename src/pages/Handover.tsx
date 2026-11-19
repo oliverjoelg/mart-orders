@@ -10,6 +10,7 @@ import { compareSizes } from '../lib/import/normalize'
 import { can } from '../lib/permissions'
 import { useData } from '../lib/store'
 import type { Buyer, ItemView } from '../lib/types'
+import { PAGE_HINTS } from '../lib/hints'
 
 interface Student {
   buyer: Buyer
@@ -96,7 +97,7 @@ export default function Handover() {
     <div className="page narrow">
       <PageHead
         title="Handover desk"
-        sub={`${plural(waiting, 'student')} with items waiting in MART`}
+        sub={`${PAGE_HINTS['/desk']} ${plural(waiting, 'student')} with items waiting in MART.`}
         hideTitleOnMobile
       />
 
@@ -128,6 +129,7 @@ export default function Handover() {
               style={{ position: 'absolute', right: 8, top: 11 }}
               onClick={reset}
               aria-label="Clear search"
+              title="Clear search"
             >
               <X size={16} />
             </button>

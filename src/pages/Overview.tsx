@@ -12,6 +12,7 @@ import { plural, timeAgo } from '../lib/format'
 import { buildInventory } from '../lib/inventory'
 import { useData } from '../lib/store'
 import { STATUS_LABEL, STATUSES, type AuditEntry } from '../lib/types'
+import { PAGE_HINTS } from '../lib/hints'
 
 export default function Overview() {
   const { items, products, snapshot, campaign, buyersById } = useData()
@@ -34,7 +35,7 @@ export default function Overview() {
     <div className="page">
       <PageHead
         title="Overview"
-        sub={campaign ? `${campaign.name} · ${plural(new Set(items.map((i) => i.buyer_id)).size, 'student')}` : 'No sales round yet'}
+        sub={campaign ? `${PAGE_HINTS['/']} ${campaign.name} · ${plural(new Set(items.map((i) => i.buyer_id)).size, 'student')}` : 'No sales round yet'}
         actions={
           <>
             <button

@@ -188,7 +188,7 @@ export function Modal({
       <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
         <div className="modal-head">
           <h2>{title}</h2>
-          <button className="btn btn-ghost btn-icon btn-sm" onClick={onClose} aria-label="Close">
+          <button className="btn btn-ghost btn-icon btn-sm" onClick={onClose} aria-label="Close" title="Close">
             <X size={16} />
           </button>
         </div>
@@ -216,7 +216,7 @@ export function Drawer({
       <aside className="drawer" role="dialog" aria-modal="true">
         <div className="modal-head">
           <h2>{title}</h2>
-          <button className="btn btn-ghost btn-icon btn-sm" onClick={onClose} aria-label="Close">
+          <button className="btn btn-ghost btn-icon btn-sm" onClick={onClose} aria-label="Close" title="Close">
             <X size={16} />
           </button>
         </div>

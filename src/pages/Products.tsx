@@ -9,6 +9,7 @@ import { downloadXlsx } from '../lib/import/readFile'
 import { can, isSuperRole } from '../lib/permissions'
 import { useData } from '../lib/store'
 import type { Product } from '../lib/types'
+import { PAGE_HINTS } from '../lib/hints'
 
 const splitList = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean)
 
@@ -37,7 +38,7 @@ export default function Products() {
     <div className="page">
       <PageHead
         title="Products"
-        sub={campaign ? `${campaign.name} · used to match the form's colour answers at import` : 'No sales round yet'}
+        sub={campaign ? `${PAGE_HINTS['/products']} Showing ${campaign.name}; product names are matched to the form's colour answers at import.` : 'No sales round yet'}
         actions={
           admin && (
             <>
