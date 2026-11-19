@@ -46,6 +46,8 @@ const ACTIONS = {
   pagePrint: 'page_print_list',
   pageActivity: 'page_activity',
   pageProducts: 'page_products',
+  pagePayments: 'page_payments',
+  checkPayments: 'check_payments',
 } as const
 
 export type Action = keyof typeof ACTIONS | 'super'

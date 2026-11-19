@@ -23,6 +23,9 @@ export type HeaderKind =
   | 'addAnother'
   | 'total'
   | 'amount'
+  | 'paidTo'
+  | 'txn'
+  | 'screenshot'
   | 'end'
   | 'comments'
   | 'other'
@@ -45,6 +48,10 @@ export interface ColumnMap {
   section?: number
   total?: number
   amount?: number
+  /** whose QR code the student paid to */
+  paidTo?: number
+  txn?: number
+  screenshot?: number
   comments?: number
   /** index 0 = shirt 1 */
   slots: SlotColumns[]
@@ -62,6 +69,10 @@ export function classifyHeader(raw: string): HeaderKind {
   const h = normaliseHeader(raw)
   if (!h) return 'other'
   if (h.startsWith('timestamp')) return 'timestamp'
+  // payment questions (checked first: they mention "transaction", "total amount", "qr")
+  if (h.includes('screenshot')) return 'screenshot'
+  if (/^(transaction|txn|utr|upi ref)/.test(h)) return 'txn'
+  if (/^(payment|paid to|pay to)/.test(h) && /qr|scan|paid to|pay to/.test(h)) return 'paidTo'
   if (h.includes('email')) return 'email'
   if (h.includes('name to be displayed') || h.includes('back')) return 'print'
   if (h.startsWith('name')) return 'buyerName'
@@ -119,6 +130,11 @@ export function buildColumnMap(headers: string[]): ColumnMap {
       inMainBlock = false
       return
     }
+    if (kind === 'paidTo' || kind === 'txn' || kind === 'screenshot') {
+      if (map[kind] === undefined) map[kind] = i
+      inMainBlock = false
+      return
+    }
     if (kind === 'end') {
       inMainBlock = false
       return
@@ -163,6 +179,7 @@ export function describeColumnMap(headers: string[], map: ColumnMap): string[] {
     `Name: ${name(map.buyerName)} · Email: ${name(map.email)} · Phone: ${name(map.phone)}`,
     `Batch: ${name(map.batch)} · Course: ${name(map.course)} · Section: ${name(map.section)}`,
     `Total shirts: ${name(map.total)}`,
+    `Payment: paid to ${name(map.paidTo)} · amount ${name(map.amount)} · transaction ID ${name(map.txn)} · screenshot ${name(map.screenshot)}`,
   ]
   map.slots.forEach((s, i) => {
     const list = (cols: number[]) => (cols.length ? cols.map((c) => name(c)).join(' or ') : '—')

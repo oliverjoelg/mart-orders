@@ -1,7 +1,7 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 import { pickCampaign, type ActivityQuery, type Api, type AuthUser, type ImportArgs, type Snapshot } from './api'
 import { getSupabase } from './supabase'
-import type { AuditEntry, Buyer, Handover, Member, Note, OrderItem } from './types'
+import type { AuditEntry, Buyer, Handover, Member, Note, OrderItem, Payment } from './types'
 
 
 
@@ -127,7 +127,7 @@ export function createSupabaseApi(): Api {
     async exportAll() {
       const tables: [string, string][] = [
         ['campaigns', 'id'], ['products', 'id'], ['buyers', 'id'], ['order_items', 'id'], ['handovers', 'id'],
-        ['notes', 'id'], ['spare_stock', 'id'], ['imports', 'id'], ['members', 'id'], ['roles', 'sort_order'],
+        ['notes', 'id'], ['payments', 'id'], ['spare_stock', 'id'], ['imports', 'id'], ['members', 'id'], ['roles', 'sort_order'],
         ['role_permissions', 'role_key'], ['audit_log', 'id'],
       ]
       const out: Record<string, Record<string, unknown>[]> = {}
@@ -172,8 +172,34 @@ export function createSupabaseApi(): Api {
           p_duplicates_skipped: a.duplicatesSkipped,
           p_buyers: a.buyers,
           p_items: a.items,
+          p_payments: a.payments ?? [],
         }),
-      ) as { items_created: number }
+      ) as { items_created: number; payments_added: number }
+    },
+
+    async loadPayments(campaignId) {
+      return fetchAll<Payment>('payments', undefined, 'id', { eq: [['campaign_id', campaignId]] })
+    },
+
+    async updatePayment(id, patch) {
+      return check(await sb.from('payments').update(patch).eq('id', id).select().single()) as Payment
+    },
+
+    async addPayment(p) {
+      return check(await sb.from('payments').insert(p).select().single()) as Payment
+    },
+
+    async deletePayment(id) {
+      check(await sb.from('payments').delete().eq('id', id))
+    },
+
+    async txnElsewhere(txnIds, campaignId) {
+      const out: { txn_id: string; campaign_id: string }[] = []
+      for (let i = 0; i < txnIds.length; i += 100) {
+        const res = await sb.from('payments').select('txn_id, campaign_id').in('txn_id', txnIds.slice(i, i + 100)).neq('campaign_id', campaignId)
+        out.push(...(check(res) as { txn_id: string; campaign_id: string }[]))
+      }
+      return out
     },
 
     async addNote(n) {

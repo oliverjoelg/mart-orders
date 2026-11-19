@@ -95,6 +95,27 @@ export interface Note {
   created_at: string
 }
 
+export type PaymentStatus = 'unchecked' | 'received' | 'problem'
+
+/** What a student says they paid (from the order form), and whether someone has checked it. */
+export interface Payment {
+  id: string
+  campaign_id: string
+  buyer_id: string
+  /** the form response it came from; null = added by hand */
+  source_timestamp: string | null
+  /** whose QR code they paid to */
+  paid_to: string | null
+  amount_paid: number | null
+  txn_id: string | null
+  screenshot_url: string | null
+  status: PaymentStatus
+  note: string | null
+  checked_by: string | null
+  checked_at: string | null
+  created_at: string
+}
+
 export interface SpareStock {
   id: string
   product_id: string

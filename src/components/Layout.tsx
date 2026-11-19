@@ -15,6 +15,7 @@ import {
   Tag,
   Upload,
   Users,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
@@ -45,6 +46,7 @@ export const NAV: NavItem[] = [
   { to: '/print', label: 'Vendor print list', icon: Printer, group: 'Stock', need: 'pagePrint' },
   { to: '/exports', label: 'Student lists', short: 'Lists', icon: Send, group: 'Students', need: 'pageLists' },
   { to: '/import', label: 'Add orders', icon: Upload, group: 'Data', need: 'import' },
+  { to: '/payments', label: 'Payments', icon: Wallet, group: 'Students', need: 'pagePayments' },
   { to: '/activity', label: 'Activity', icon: History, group: 'Data', need: 'pageActivity' },
   { to: '/products', label: 'Products', icon: Tag, group: 'Settings', need: 'pageProducts' },
   { to: '/team', label: 'Roles & permissions', short: 'Team', icon: Users, group: 'Admin', need: 'manageMembers' },

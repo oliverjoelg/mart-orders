@@ -25,14 +25,19 @@ export async function readSpreadsheet(file: File): Promise<Sheet[]> {
   const XLSX = await import('xlsx')
   const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true })
   return wb.SheetNames.map((name) => {
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], {
-      header: 1,
-      raw: false,
-      dateNF: 'yyyy-mm-dd hh:mm:ss',
-      defval: '',
-      blankrows: true,
-    })
-    return { name, rows: rows.map((r) => r.map((c) => String(c ?? ''))) }
+    const opts = { header: 1 as const, dateNF: 'yyyy-mm-dd hh:mm:ss', defval: '', blankrows: true }
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { ...opts, raw: false })
+    const raw = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { ...opts, raw: true })
+    // Excel shows long numbers (12-digit UPI transaction IDs) as "5.12346E+11"; keep every digit
+    return {
+      name,
+      rows: rows.map((r, ri) =>
+        r.map((c, ci) => {
+          const v = raw[ri]?.[ci]
+          return typeof v === 'number' && Number.isInteger(v) && Math.abs(v) >= 1e9 ? String(v) : String(c ?? '')
+        }),
+      ),
+    }
   }).filter((s) => s.rows.some((r) => r.some((c) => c.trim())))
 }
 
