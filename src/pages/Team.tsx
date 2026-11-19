@@ -6,7 +6,7 @@ import { friendlyError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { assignableRoles, can } from '../lib/permissions'
 import { useData } from '../lib/store'
-import { ROLE_LABEL, type Member, type Role } from '../lib/types'
+import { memberLabel, ROLE_LABEL, type Member, type Role } from '../lib/types'
 
 const ROLE_HELP: Record<Role, string> = {
   main_admin: 'Everything. Adds and removes anyone, including other super admins',
@@ -22,7 +22,7 @@ export default function Team() {
   const role = member?.role
   const roles = assignableRoles(role)
   const members = [...(snapshot?.members ?? [])].sort(
-    (a, b) => Number(b.active) - Number(a.active) || a.display_name.localeCompare(b.display_name),
+    (a, b) => Number(b.active) - Number(a.active) || memberLabel(a).localeCompare(memberLabel(b)),
   )
   const canEdit = (m: Member) => can(role, 'manageMembers') && (role === 'main_admin' || roles.includes(m.role))
 
@@ -57,8 +57,9 @@ export default function Team() {
                 <tr key={m.id} className={m.active ? '' : 'subtle'}>
                   <td>
                     <div className="row" style={{ flexWrap: 'nowrap' }}>
-                      <Avatar name={m.display_name} />
-                      <span style={{ fontWeight: 500 }}>{m.display_name}</span>
+                      <Avatar name={memberLabel(m)} />
+                      <span style={{ fontWeight: 500 }}>{memberLabel(m)}</span>
+                      {m.nickname && m.user_id && <span className="hint">({m.display_name})</span>}
                       {m.id === member?.id && <span className="badge">You</span>}
                       {!m.user_id && <span className="badge badge-amber">Not signed in yet</span>}
                     </div>
@@ -78,10 +79,10 @@ export default function Team() {
           <div className="list-cards">
             {members.map((m) => (
               <div key={m.id} className="list-card" onClick={() => canEdit(m) && setEditing(m)}>
-                <Avatar name={m.display_name} />
+                <Avatar name={memberLabel(m)} />
                 <div className="body">
                   <div className="row between">
-                    <span className="title">{m.display_name}</span>
+                    <span className="title">{memberLabel(m)}</span>
                     <RoleBadge role={m.role} />
                   </div>
                   <div className="hint mono">{m.email}{m.active ? '' : ' · off'}{m.user_id ? '' : ' · not signed in yet'}</div>
@@ -111,7 +112,7 @@ export default function Team() {
           onSave={async (m) => {
             try {
               await api.saveMember(m)
-              toast.ok(m.id ? 'Member updated' : `${m.display_name} can now sign in`)
+              toast.ok(m.id ? 'Member updated' : `${m.nickname || m.email} can now sign in`)
               setEditing(null)
               await refresh()
             } catch (e) {
@@ -148,7 +149,7 @@ function MemberModal({
   initial: Partial<Member>
   roles: Role[]
   onClose(): void
-  onSave(m: { id?: string; email: string; display_name: string; role: Role; active: boolean }): Promise<void>
+  onSave(m: { id?: string; email: string; display_name: string; nickname: string | null; role: Role; active: boolean }): Promise<void>
   /** only passed for the super admin, on existing members */
   onRemove?(): Promise<void>
 }) {
@@ -156,6 +157,7 @@ function MemberModal({
     id: initial.id,
     email: initial.email ?? '',
     display_name: initial.display_name ?? '',
+    nickname: initial.nickname ?? '',
     role: (initial.role ?? 'ops') as Role,
     active: initial.active ?? true,
   })
@@ -176,7 +178,7 @@ function MemberModal({
               style={{ marginRight: 'auto' }}
               disabled={busy}
               onClick={async () => {
-                if (!window.confirm(`Remove ${m.display_name} from the team? They will no longer be able to sign in.`)) return
+                if (!window.confirm(`Remove ${m.nickname || m.display_name} from the team? They will no longer be able to sign in.`)) return
                 setBusy(true)
                 await onRemove()
                 setBusy(false)
@@ -192,7 +194,7 @@ function MemberModal({
             onClick={async () => {
               setBusy(true)
               // Names come from Google at sign-in; until then show the part before the @.
-              await onSave({ ...m, display_name: m.display_name.trim() || m.email.trim().split('@')[0] })
+              await onSave({ ...m, nickname: m.nickname.trim() || null, display_name: m.display_name.trim() || m.email.trim().split('@')[0] })
               setBusy(false)
             }}
           >
@@ -203,11 +205,15 @@ function MemberModal({
     >
       {m.id && (
         <div className="field">
-          <span className="label">Name</span>
+          <span className="label">Name from Google</span>
           <span>{signedIn ? m.display_name : <span className="muted">Not signed in yet</span>}</span>
         </div>
       )}
-      <span className="hint">Names come from each person's Google account when they sign in.</span>
+      <div className="field">
+        <label htmlFor="m-nick">Nickname (optional)</label>
+        <input id="m-nick" className="input" value={m.nickname} placeholder="Leave empty to use their Google name" onChange={(e) => setM({ ...m, nickname: e.target.value })} />
+        <span className="hint">Shown in the app and the activity log instead of their Google name.</span>
+      </div>
       <div className="field">
         <label htmlFor="m-email">MDI email</label>
         <input

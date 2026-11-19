@@ -63,7 +63,7 @@ export function describeEntry(e: AuditEntry, ctx: DescribeCtx): { text: string; 
       return { text: `updated student ${roll} (${changed.join(', ')})`, tone: '' }
     }
     case 'members': {
-      const name = str(n.display_name ?? o.display_name)
+      const name = str(n.nickname ?? o.nickname ?? n.display_name ?? o.display_name)
       if (e.action === 'INSERT') return { text: `added ${name} to the team as ${ROLE_LABEL[n.role as Role]}`, tone: 'green' }
       if (e.action === 'DELETE') return { text: `removed ${name} from the team`, tone: 'red' }
       if (changed.includes('role')) return { text: `changed ${name}'s role: ${ROLE_LABEL[o.role as Role]} → ${ROLE_LABEL[n.role as Role]}`, tone: 'amber' }

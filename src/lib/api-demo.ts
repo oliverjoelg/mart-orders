@@ -162,7 +162,7 @@ function entry(
   changed: string[] | null = null,
 ): AuditEntry {
   return {
-    id, at, actor_id: USER_ID[m.id] ?? null, actor_email: m.email, actor_name: m.display_name, actor_role: m.role,
+    id, at, actor_id: USER_ID[m.id] ?? null, actor_email: m.email, actor_name: m.nickname?.trim() || m.display_name, actor_role: m.role,
     action, table_name: table, row_id: rowId, item_id: itemId,
     old_data: oldData as Record<string, unknown> | null, new_data: newData as Record<string, unknown> | null, changed,
   }
