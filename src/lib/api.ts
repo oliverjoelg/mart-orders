@@ -1,5 +1,6 @@
 import type {
   AuditEntry,
+  Campaign as CampaignRow,
   Buyer,
   Campaign,
   HandoverType,
@@ -28,6 +29,8 @@ export interface Snapshot {
   roles: RoleRow[]
   permissions: PermissionRow[]
   rolePermissions: RolePermissionRow[]
+  /** the sales round whose items/students/handovers are loaded (one at a time, to keep downloads small) */
+  campaignId: string | null
 }
 
 export interface AuthUser {
@@ -69,7 +72,14 @@ export interface Api {
   /** the signed-in user's active member row, or null if they are not on the team */
   getMyMember(user: AuthUser): Promise<Member | null>
 
-  loadSnapshot(): Promise<Snapshot>
+  /** Loads one sales round (or the default one) plus the small shared tables. */
+  loadSnapshot(campaignId?: string | null): Promise<Snapshot>
+  /** Re-fetches just these items and their live handovers (after a handover, receive, etc.). */
+  loadItems(ids: string[]): Promise<{ items: OrderItem[]; handovers: Handover[] }>
+  /** A student from any round you can see, by roll number (for adding an order by hand). */
+  findBuyer(rollNo: string): Promise<Buyer | null>
+  /** Super admin: every table, every round, for the backup file. */
+  exportAll(): Promise<Record<string, Record<string, unknown>[]>>
   setItemsStatus(ids: string[], status: Exclude<ItemStatus, 'handed_over'>): Promise<number>
   recordHandover(ids: string[], type: HandoverType, collectorName?: string, collectorRoll?: string): Promise<number>
   undoHandover(itemId: string, reason: string): Promise<void>
@@ -105,4 +115,16 @@ export function friendlyError(e: unknown): string {
   if (/Failed to fetch|NetworkError/i.test(msg)) return 'No connection to the server. Check the internet and try again.'
   if (/JWT|session/i.test(msg)) return 'Your sign-in expired. Please sign in again.'
   return msg
+}
+
+/** The round to load: the one asked for if visible, else unlocked + open + newest first. */
+export function pickCampaign(campaigns: CampaignRow[], wanted?: string | null): string | null {
+  if (wanted && campaigns.some((c) => c.id === wanted)) return wanted
+  const sorted = [...campaigns].sort(
+    (a, b) =>
+      Number(!!a.locked) - Number(!!b.locked) ||
+      Number(b.is_active) - Number(a.is_active) ||
+      (b.created_at ?? '').localeCompare(a.created_at ?? ''),
+  )
+  return sorted[0]?.id ?? null
 }

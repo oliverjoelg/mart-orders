@@ -16,7 +16,7 @@ import type { ItemView, Product } from '../lib/types'
  * at once), confirm. They become "In MART" and show up as ready at the handover desk.
  */
 export default function Receive() {
-  const { items, products, refresh } = useData()
+  const { items, products, refreshItems } = useData()
   const { api, member } = useAuth()
   const toast = useToast()
   const [productId, setProductId] = useState<string | null>(null)
@@ -75,11 +75,12 @@ export default function Receive() {
   const save = async () => {
     setBusy(true)
     try {
-      const n = await api.setItemsStatus([...ticked], 'received')
+      const ids = [...ticked]
+      const n = await api.setItemsStatus(ids, 'received')
       setDone(`${plural(n, `${product?.colour ?? ''} item`)} marked as arrived. Students can now collect them at the desk.`)
       setTicked(new Set())
       setConfirm(false)
-      await refresh()
+      await refreshItems(ids)
       window.scrollTo({ top: 0 })
     } catch (e) {
       toast.err(friendlyError(e))

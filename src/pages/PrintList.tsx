@@ -1,5 +1,5 @@
-import { Copy, Download, Printer, Truck } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { Copy, Download, Printer, Search, Truck, X } from 'lucide-react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useToast } from '../components/Toast'
 import { Empty, Modal, PageHead, ProductLabel, Segmented } from '../components/ui'
 import { friendlyError } from '../lib/api'
@@ -19,21 +19,55 @@ const SCOPES: { value: Scope; label: string }[] = [
   { value: 'all', label: 'All items' },
 ]
 
+interface Group {
+  product: ItemView['product']
+  sizes: { size: string; items: ItemView[] }[]
+  count: number
+}
+
+function groupItems(list: ItemView[]): Group[] {
+  const out: Group[] = []
+  for (const i of list) {
+    let g = out.find((x) => x.product.id === i.product_id)
+    if (!g) out.push((g = { product: i.product, sizes: [], count: 0 }))
+    let s = g.sizes.find((x) => x.size === i.size)
+    if (!s) g.sizes.push((s = { size: i.size, items: [] }))
+    s.items.push(i)
+    g.count++
+  }
+  return out
+}
+
+/** Text the vendor gets when you press Copy. */
+function vendorText(groups: Group[]): string {
+  return groups
+    .map(
+      (g) =>
+        `${g.product.name} — ${g.count}\n` +
+        g.sizes
+          .map((s) => `  ${s.size} (${s.items.length}): ${s.items.map((i) => `${i.print_name ?? '—'}${i.batch ? ` [${i.batch}]` : ''}`).join(', ')}`)
+          .join('\n'),
+    )
+    .join('\n\n')
+}
+
 export default function PrintList() {
-  const { items, products, refresh } = useData()
+  const { items, products, refreshItems } = useData()
   const { api, member } = useAuth()
   const toast = useToast()
   const [scope, setScope] = useState<Scope>('ordered')
   const [productId, setProductId] = useState('')
+  const [size, setSize] = useState('')
+  const [q, setQ] = useState('')
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
-  // ticked items; none ticked = the whole list
+  // ticked items; none ticked = everything shown
   const [picked, setPicked] = useState<Set<string>>(new Set())
   useEffect(() => {
     setPicked(new Set())
   }, [scope, productId])
 
-  const list = useMemo(
+  const inScope = useMemo(
     () =>
       items
         .filter(
@@ -45,29 +79,33 @@ export default function PrintList() {
           (a, b) =>
             a.product.sort_order - b.product.sort_order ||
             compareSizes(a.size, b.size) ||
-            (a.batch ?? '').localeCompare(b.batch ?? '') ||
-            (a.print_name ?? '~').localeCompare(b.print_name ?? '~'),
+            (a.print_name ?? '~').localeCompare(b.print_name ?? '~') ||
+            a.buyer.roll_no.localeCompare(b.buyer.roll_no),
         ),
     [items, scope, productId],
   )
+  const sizes = useMemo(() => [...new Set(inScope.map((i) => i.size))].sort(compareSizes), [inScope])
 
-  const groups = useMemo(() => {
-    const out: { product: ItemView['product']; sizes: { size: string; items: ItemView[] }[]; count: number }[] = []
-    for (const i of list) {
-      let g = out.find((x) => x.product.id === i.product_id)
-      if (!g) out.push((g = { product: i.product, sizes: [], count: 0 }))
-      let s = g.sizes.find((x) => x.size === i.size)
-      if (!s) g.sizes.push((s = { size: i.size, items: [] }))
-      s.items.push(i)
-      g.count++
-    }
-    return out
-  }, [list])
+  // what the table shows (size + search narrow it down)
+  const shown = useMemo(() => {
+    const term = q.trim().toLowerCase()
+    return inScope.filter(
+      (i) =>
+        (!size || i.size === size) &&
+        (!term ||
+          (i.print_name ?? '').toLowerCase().includes(term) ||
+          i.buyer.roll_no.toLowerCase().includes(term) ||
+          i.buyer.name.toLowerCase().includes(term)),
+    )
+  }, [inScope, size, q])
 
-  const allSizes = useMemo(() => [...new Set(list.map((i) => i.size))].sort(compareSizes), [list])
+  const groups = useMemo(() => groupItems(shown), [shown])
+  const target = picked.size ? inScope.filter((i) => picked.has(i.id)) : shown
+  const targetGroups = useMemo(() => groupItems(target), [target])
+  const which = picked.size ? plural(target.length, 'ticked item') : plural(shown.length, 'item')
+  const toSend = target.filter((i) => i.status === 'ordered')
+  const allShownTicked = shown.length > 0 && shown.every((i) => picked.has(i.id))
 
-  const target = picked.size ? list.filter((i) => picked.has(i.id)) : list
-  const which = picked.size ? plural(target.length, 'ticked item') : plural(list.length, 'item')
   const toggle = (ids: string[], on: boolean) => {
     const n = new Set(picked)
     for (const id of ids) {
@@ -77,40 +115,22 @@ export default function PrintList() {
     setPicked(n)
   }
 
-  const targetGroups = useMemo(() => {
-    const out: { product: ItemView['product']; sizes: { size: string; items: ItemView[] }[]; count: number }[] = []
-    for (const i of target) {
-      let g = out.find((x) => x.product.id === i.product_id)
-      if (!g) out.push((g = { product: i.product, sizes: [], count: 0 }))
-      let sz = g.sizes.find((x) => x.size === i.size)
-      if (!sz) g.sizes.push((sz = { size: i.size, items: [] }))
-      sz.items.push(i)
-      g.count++
-    }
-    return out
-  }, [target])
-
-  const text = targetGroups
-    .map(
-      (g) =>
-        `${g.product.name} — ${g.count}\n` +
-        g.sizes
-          .map((s) => `  ${s.size} (${s.items.length}): ${s.items.map((i) => `${i.print_name ?? '—'}${i.batch ? ` [${i.batch}]` : ''}`).join(', ')}`)
-          .join('\n'),
-    )
-    .join('\n\n')
+  const copy = () => void copyText(vendorText(targetGroups)).then(() => toast.ok(`Copied ${which}`))
+  const csv = () =>
+    downloadCsv(`mart-print-list-${fileStamp()}.csv`, [
+      ['Product', 'Colour', 'Size', 'Name on back', 'Batch', 'Roll number'],
+      ...target.map((i) => [i.product.name, i.product.colour, i.size, i.print_name ?? '', i.batch ?? '', i.buyer.roll_no]),
+    ])
 
   const markSent = async () => {
     setBusy(true)
     try {
-      const n = await api.setItemsStatus(
-        target.filter((i) => i.status === 'ordered').map((i) => i.id),
-        'sent_to_vendor',
-      )
+      const ids = toSend.map((i) => i.id)
+      const n = await api.setItemsStatus(ids, 'sent_to_vendor')
       toast.ok(`${plural(n, 'item')} marked as sent to the vendor`)
       setConfirm(false)
       setPicked(new Set())
-      await refresh()
+      await refreshItems(ids)
     } catch (e) {
       toast.err(friendlyError(e))
     } finally {
@@ -118,30 +138,23 @@ export default function PrintList() {
     }
   }
 
+  const canSend = scope !== 'with_vendor' && can(member?.role, 'setStatus') && toSend.length > 0
+
   return (
-    <div className="page">
+    <div className={`page${picked.size ? ' printing-picked' : ''}`}>
       <PageHead
         title="Vendor print list"
-        sub="Per colour and size, with the names for the back. Send this to the vendor."
+        sub="What to send the vendor: each colour and size, with the names for the back."
         actions={
           <>
-            <button className="btn" disabled={!list.length} onClick={() => void copyText(text).then(() => toast.ok(`Copied ${which}`))}>
-              <Copy size={15} /> Copy{picked.size ? ` ${picked.size}` : ''}
+            <button className="btn" disabled={!target.length} onClick={copy}>
+              <Copy size={15} /> Copy
             </button>
-            <button
-              className="btn"
-              disabled={!list.length}
-              onClick={() =>
-                downloadCsv(`mart-print-list-${fileStamp()}.csv`, [
-                  ['Product', 'Colour', 'Size', 'Batch', 'Name on back', 'Roll number'],
-                  ...target.map((i) => [i.product.name, i.product.colour, i.size, i.batch ?? '', i.print_name ?? '', i.buyer.roll_no]),
-                ])
-              }
-            >
-              <Download size={15} /> CSV{picked.size ? ` (${picked.size})` : ''}
+            <button className="btn" disabled={!target.length} onClick={csv}>
+              <Download size={15} /> CSV
             </button>
-            <button className="btn hide-mobile" disabled={!list.length} onClick={() => window.print()}>
-              <Printer size={15} /> Print{picked.size ? ` ${picked.size}` : ''}
+            <button className="btn hide-mobile" disabled={!target.length} onClick={() => window.print()}>
+              <Printer size={15} /> Print
             </button>
           </>
         }
@@ -149,20 +162,27 @@ export default function PrintList() {
 
       <div className="toolbar">
         <Segmented label="Which items" value={scope} onChange={setScope} options={SCOPES} />
-        <select className="select" value={productId} onChange={(e) => setProductId(e.target.value)} aria-label="Product">
+      </div>
+      <div className="toolbar">
+        <select className="select" value={productId} onChange={(e) => setProductId(e.target.value)} aria-label="Colour">
           <option value="">All colours</option>
           {products.map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
-        {scope === 'ordered' && can(member?.role, 'setStatus') && list.length > 0 && (
-          <button className="btn btn-outline-accent" onClick={() => setConfirm(true)}>
-            <Truck size={15} /> Mark {which} as sent
-          </button>
-        )}
+        <select className="select" value={size} onChange={(e) => setSize(e.target.value)} aria-label="Size">
+          <option value="">All sizes</option>
+          {sizes.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <div className="input-wrap grow">
+          <Search size={15} className="sm" />
+          <input className="input input-sm-icon" placeholder="Find a back name or roll no." value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
       </div>
 
-      {list.length === 0 ? (
+      {inScope.length === 0 ? (
         <div className="card">
           <Empty icon={<Printer size={20} />} title="Nothing to print">
             {scope === 'ordered' ? 'Every ordered item has already been sent to the vendor.' : 'No items match.'}
@@ -170,37 +190,23 @@ export default function PrintList() {
         </div>
       ) : (
         <div className="stack">
-          <div className="callout no-print" style={{ alignItems: 'center' }}>
-            <div style={{ flex: 1 }}>
-              {picked.size ? (
-                <>
-                  <b>{plural(picked.size, 'item')} ticked.</b> Copy, CSV, Print and “Mark as sent” use only these.
-                </>
-              ) : (
-                <>Everything below is included. To send only some orders, tick them (or tick a whole size).</>
-              )}
-            </div>
-            {picked.size > 0 && (
-              <button className="btn btn-sm" onClick={() => setPicked(new Set())}>Untick all</button>
-            )}
-          </div>
-
-          <div className={`table-wrap hide-mobile${picked.size ? ' no-print' : ''}`}>
+          {/* totals the vendor needs first */}
+          <div className="table-wrap hide-mobile print-totals">
             <table className="table grid-table">
               <thead>
                 <tr>
                   <th>Colour</th>
-                  {allSizes.map((s) => (
+                  {sizes.map((s) => (
                     <th key={s} className="cell" title={s}>{s.length > 6 ? 'Custom' : s}</th>
                   ))}
                   <th className="total">Total</th>
                 </tr>
               </thead>
               <tbody>
-                {groups.map((g) => (
+                {groupItems(target).map((g) => (
                   <tr key={g.product.id}>
                     <td className="nowrap"><ProductLabel product={g.product} /></td>
-                    {allSizes.map((s) => {
+                    {sizes.map((s) => {
                       const n = g.sizes.find((x) => x.size === s)?.items.length ?? 0
                       return <td key={s} className={`cell${n ? '' : ' zero'}`}>{n || '·'}</td>
                     })}
@@ -211,52 +217,110 @@ export default function PrintList() {
             </table>
           </div>
 
+          <div className="row between no-print">
+            <span className="muted">
+              {picked.size
+                ? `${plural(picked.size, 'item')} ticked — Copy, CSV, Print and “Mark as sent” use only these.`
+                : `Showing ${plural(shown.length, 'item')}. Nothing ticked = everything shown is included.`}
+            </span>
+            {shown.length > 0 && (
+              <button className="btn btn-sm" onClick={() => toggle(shown.map((i) => i.id), !allShownTicked)}>
+                {allShownTicked ? 'Untick all shown' : `Tick all shown (${shown.length})`}
+              </button>
+            )}
+          </div>
+
+          {shown.length === 0 && <span className="hint">No item matches “{q}”.</span>}
+
           {groups.map((g) => (
-            <div
-              key={g.product.id}
-              className={`card print-group${picked.size && !g.sizes.some((sz) => sz.items.some((i) => picked.has(i.id))) ? ' no-print' : ''}`}
-            >
+            <div key={g.product.id} className={`card print-group${picked.size && !g.sizes.some((s) => s.items.some((i) => picked.has(i.id))) ? ' no-print' : ''}`}>
               <div className="card-head">
                 <h3><ProductLabel product={g.product} /></h3>
                 <span className="badge">{plural(g.count, 'item')}</span>
               </div>
-              <div className="card-body stack">
-                {g.sizes.map((s) => {
-                  const ids = s.items.map((i) => i.id)
-                  const on = ids.filter((id) => picked.has(id)).length
-                  return (
-                    <div key={s.size} className={`stack-sm${picked.size && !on ? ' no-print' : ''}`}>
-                      <div className="row">
-                        <label className="check no-print" title={`Tick all ${s.size}`}>
-                          <input
-                            type="checkbox"
-                            checked={on === ids.length}
-                            ref={(el) => {
-                              if (el) el.indeterminate = on > 0 && on < ids.length
-                            }}
-                            onChange={(e) => toggle(ids, e.target.checked)}
-                            aria-label={`Tick all ${g.product.colour} ${s.size}`}
-                          />
-                        </label>
-                        <span className="shirt-size" style={{ height: 30, minWidth: 34 }}>{s.size.length > 5 ? '…' : s.size}</span>
-                        <span className="muted">{s.size.length > 5 ? s.size : ''} {plural(s.items.length, 'item')}</span>
-                      </div>
-                      <div className="print-names">
-                        {s.items.map((i) => (
-                          <label key={i.id} className={`print-pick${picked.has(i.id) ? ' on' : ''}${picked.size && !picked.has(i.id) ? ' no-print' : ''}`}>
-                            <input type="checkbox" className="no-print" checked={picked.has(i.id)} onChange={(e) => toggle([i.id], e.target.checked)} />
-                            <b>{i.print_name ?? <span className="subtle">— no name —</span>}</b>
-                            <span className="subtle">{i.batch}</span>
-                            <span className="subtle mono no-print" style={{ fontSize: 11 }}>{i.buyer.roll_no}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
+              <div className="table-wrap print-table" style={{ border: 0, borderRadius: 0 }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th className="check-col no-print" />
+                      <th style={{ width: 70 }}>Size</th>
+                      <th>Name on back</th>
+                      <th style={{ width: 90 }}>Batch</th>
+                      <th className="no-print hide-mobile">Roll no.</th>
+                      <th className="no-print hide-mobile">Student</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {g.sizes.map((s) => {
+                      const ids = s.items.map((i) => i.id)
+                      const on = ids.filter((id) => picked.has(id)).length
+                      return (
+                        <Fragment key={s.size}>
+                          <tr className={`size-row-head${picked.size && !on ? ' no-print' : ''}`}>
+                            <td className="check-col no-print">
+                              <input
+                                type="checkbox"
+                                checked={on === ids.length}
+                                ref={(el) => {
+                                  if (el) el.indeterminate = on > 0 && on < ids.length
+                                }}
+                                onChange={(e) => toggle(ids, e.target.checked)}
+                                aria-label={`Tick all ${g.product.colour} ${s.size}`}
+                              />
+                            </td>
+                            <td colSpan={5}>
+                              <b>{s.size}</b> <span className="muted">· {plural(s.items.length, 'item')}</span>
+                            </td>
+                          </tr>
+                          {s.items.map((i) => (
+                            <tr
+                              key={i.id}
+                              className={`clickable${picked.has(i.id) ? ' selected' : ''}${picked.size && !picked.has(i.id) ? ' no-print' : ''}`}
+                              onClick={() => toggle([i.id], !picked.has(i.id))}
+                            >
+                              <td className="check-col no-print">
+                                <input type="checkbox" checked={picked.has(i.id)} readOnly aria-label={`Tick ${i.print_name ?? 'no name'} ${i.buyer.roll_no}`} />
+                              </td>
+                              <td className="mono">{i.size}</td>
+                              <td style={{ fontWeight: 500 }}>{i.print_name ?? <span className="subtle">— no name —</span>}</td>
+                              <td className="nowrap">{i.batch ?? '—'}</td>
+                              <td className="mono muted no-print hide-mobile">{i.buyer.roll_no}</td>
+                              <td className="muted no-print hide-mobile">{i.buyer.name}</td>
+                            </tr>
+                          ))}
+                        </Fragment>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {(picked.size > 0 || canSend) && (
+        <div className="bulk-bar no-print">
+          <span className="count">{picked.size ? plural(picked.size, 'item') + ' ticked' : `All ${plural(shown.length, 'item')} shown`}</span>
+          <button className="btn btn-sm" onClick={copy}>
+            <Copy size={14} /> Copy
+          </button>
+          <button className="btn btn-sm" onClick={csv}>
+            <Download size={14} /> CSV
+          </button>
+          <button className="btn btn-sm hide-mobile" onClick={() => window.print()}>
+            <Printer size={14} /> Print
+          </button>
+          {canSend && (
+            <button className="btn btn-sm btn-primary" onClick={() => setConfirm(true)}>
+              <Truck size={14} /> Mark {toSend.length} as sent
+            </button>
+          )}
+          {picked.size > 0 && (
+            <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setPicked(new Set())} aria-label="Untick all">
+              <X size={14} />
+            </button>
+          )}
         </div>
       )}
 
@@ -268,13 +332,14 @@ export default function PrintList() {
             <>
               <button className="btn" onClick={() => setConfirm(false)}>Cancel</button>
               <button className="btn btn-primary" disabled={busy} onClick={() => void markSent()}>
-                Mark {plural(target.filter((i) => i.status === 'ordered').length, 'item')} sent
+                Mark {plural(toSend.length, 'item')} sent
               </button>
             </>
           }
         >
           <p className="muted" style={{ margin: 0 }}>
-            {picked.size ? `The ${which}` : `All ${which} on this list`} move from “Ordered” to “With vendor”. Each change is logged with your name.
+            {plural(toSend.length, 'item')} {picked.size ? '(the ticked ones)' : '(everything shown)'} move from “Ordered” to “With vendor”.
+            Each change is logged with your name.
           </p>
         </Modal>
       )}

@@ -1,5 +1,5 @@
 import { Plus, Trash2, UserCheck } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../components/Toast'
 import { friendlyError } from '../lib/api'
@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth'
 import { plural } from '../lib/format'
 import { normaliseBatch, normalisePrintName, normaliseRoll } from '../lib/import/normalize'
 import { useData } from '../lib/store'
+import type { Buyer } from '../lib/types'
 
 interface Line {
   productId: string
@@ -31,7 +32,20 @@ export default function ManualOrder() {
   const [busy, setBusy] = useState(false)
 
   const rollNo = normaliseRoll(roll)
-  const existing = useMemo(() => snapshot?.buyers.find((b) => b.roll_no === rollNo) ?? null, [snapshot, rollNo])
+  const [found, setFound] = useState<Buyer | null>(null)
+  useEffect(() => {
+    setFound(null)
+    if (rollNo.length < 4) return
+    let live = true
+    const t = setTimeout(() => {
+      api.findBuyer(rollNo).then((b) => live && setFound(b)).catch(() => {})
+    }, 300)
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
+  }, [api, rollNo])
+  const existing = useMemo(() => snapshot?.buyers.find((b) => b.roll_no === rollNo) ?? found, [snapshot, rollNo, found])
   const existingItems = useMemo(
     () => (existing ? (snapshot?.items ?? []).filter((i) => i.buyer_id === existing.id && i.campaign_id === campaign?.id) : []),
     [existing, snapshot, campaign],

@@ -75,7 +75,7 @@ export function ItemDrawer({ itemId, onClose }: { itemId: string; onClose(): voi
 
 function ItemDrawerInner({ item, onClose }: { item: ItemView; onClose(): void }) {
   const { api, member } = useAuth()
-  const { refresh, memberName, products, snapshot } = useData()
+  const { refresh, refreshItems, memberName, products, snapshot } = useData()
   const toast = useToast()
   const ctx = useDescribeCtx()
   const role = member?.role
@@ -99,7 +99,7 @@ function ItemDrawerInner({ item, onClose }: { item: ItemView; onClose(): void })
     try {
       await fn()
       toast.ok(ok)
-      await refresh()
+      await refreshItems([item.id])
     } catch (e) {
       toast.err(friendlyError(e))
     } finally {

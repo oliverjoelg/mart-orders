@@ -1828,3 +1828,24 @@ details.disclosure summary::-webkit-details-marker {
 .print-names .print-pick.on {
   background: var(--accent-soft);
 }
+
+/* print list table: one heading row per size */
+.print-table .size-row-head td {
+  background: var(--surface-2);
+  padding-top: 7px;
+  padding-bottom: 7px;
+  font-size: 13px;
+}
+.print-table .table tbody tr.size-row-head:hover td {
+  background: var(--surface-2);
+}
+@media print {
+  .print-table .size-row-head td {
+    background: #eee;
+  }
+  .print-table td,
+  .print-table th {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
