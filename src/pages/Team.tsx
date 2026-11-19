@@ -60,6 +60,7 @@ export default function Team() {
                       <Avatar name={m.display_name} />
                       <span style={{ fontWeight: 500 }}>{m.display_name}</span>
                       {m.id === member?.id && <span className="badge">You</span>}
+                      {!m.user_id && <span className="badge badge-amber">Not signed in yet</span>}
                     </div>
                   </td>
                   <td className="mono muted">{m.email}</td>
@@ -83,7 +84,7 @@ export default function Team() {
                     <span className="title">{m.display_name}</span>
                     <RoleBadge role={m.role} />
                   </div>
-                  <div className="hint mono">{m.email}{m.active ? '' : ' · off'}</div>
+                  <div className="hint mono">{m.email}{m.active ? '' : ' · off'}{m.user_id ? '' : ' · not signed in yet'}</div>
                 </div>
               </div>
             ))}
@@ -159,6 +160,7 @@ function MemberModal({
     active: initial.active ?? true,
   })
   const [busy, setBusy] = useState(false)
+  const signedIn = !!initial.user_id
   const emailOk = /^[^@\s]+@mdi\.ac\.in$/i.test(m.email.trim())
   const options = roles.includes(m.role) ? roles : [m.role, ...roles]
 
@@ -186,10 +188,11 @@ function MemberModal({
           <button className="btn" onClick={onClose}>Cancel</button>
           <button
             className="btn btn-primary"
-            disabled={!emailOk || !m.display_name.trim() || busy}
+            disabled={!emailOk || busy}
             onClick={async () => {
               setBusy(true)
-              await onSave(m)
+              // Names come from Google at sign-in; until then show the part before the @.
+              await onSave({ ...m, display_name: m.display_name.trim() || m.email.trim().split('@')[0] })
               setBusy(false)
             }}
           >
@@ -198,10 +201,13 @@ function MemberModal({
         </>
       }
     >
-      <div className="field">
-        <label htmlFor="m-name">Name</label>
-        <input id="m-name" className="input" value={m.display_name} onChange={(e) => setM({ ...m, display_name: e.target.value })} autoFocus />
-      </div>
+      {m.id && (
+        <div className="field">
+          <span className="label">Name</span>
+          <span>{signedIn ? m.display_name : <span className="muted">Not signed in yet</span>}</span>
+        </div>
+      )}
+      <span className="hint">Names come from each person's Google account when they sign in.</span>
       <div className="field">
         <label htmlFor="m-email">MDI email</label>
         <input

@@ -17,7 +17,7 @@ const SUPABASE_STUB = `
   create schema auth;
   grant usage on schema auth to anon, authenticated;
   grant usage on schema public to anon, authenticated;
-  create table auth.users (id uuid primary key default gen_random_uuid(), email text);
+  create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb);
   create function auth.jwt() returns jsonb language sql stable as $$
     select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb
   $$;
@@ -69,7 +69,7 @@ beforeAll(async () => {
   for (const f of readdirSync(MIGRATIONS).filter((x) => x.endsWith('.sql')).sort()) {
     await db.exec(readFileSync(join(MIGRATIONS, f), 'utf8'))
   }
-  // the migrations seed George as the first main admin; these tests use their own users
+  // the migrations seed Oliver as the first main admin; these tests use their own users
   const seeded = await db.query<{ role: string }>(`select role from public.members where email = 'pgdm26oliver_j@mdi.ac.in'`)
   expect(seeded.rows[0]?.role).toBe('main_admin')
   // seed members as the SQL editor would (superuser, no JWT)
@@ -210,6 +210,33 @@ describe('Ops limits', () => {
   it('Ops cannot write the audit log', async () => {
     const msg = await fails(as('ops', `insert into public.audit_log (action, table_name) values ('INSERT', 'x')`))
     expect(msg).toMatch(/permission denied/)
+  })
+})
+
+describe('names come from Google', () => {
+  it('first sign-in takes the Google name, not what was typed', async () => {
+    await db.query(`insert into public.members (email, display_name, role) values ('name.test@mdi.ac.in', 'Typed Name', 'ops')`)
+    await db.query(`insert into auth.users (email, raw_user_meta_data) values ('name.test@mdi.ac.in', '{"full_name":"Real Google Name"}')`)
+    const r = await db.query<{ display_name: string }>(`select display_name from public.members where email = 'name.test@mdi.ac.in'`)
+    expect(r.rows[0].display_name).toBe('Real Google Name')
+  })
+  it('each sign-in refreshes the name from the token', async () => {
+    await db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claims', $1, true)`, [
+        JSON.stringify({
+          sub: USERS.ops.sub,
+          email: USERS.ops.email,
+          role: 'authenticated',
+          user_metadata: { full_name: 'Ops From Google' },
+        }),
+      ])
+      await tx.exec('set local role authenticated')
+      await tx.query('select public.link_my_member()')
+    })
+    const r = await db.query<{ display_name: string }>(`select display_name from public.members where email = 'ops@mdi.ac.in'`)
+    expect(r.rows[0].display_name).toBe('Ops From Google')
+    // put the short name back for the audit-log tests below
+    await db.query(`update public.members set display_name = 'ops' where email = 'ops@mdi.ac.in'`)
   })
 })
 

@@ -2,7 +2,7 @@
 
 Internal web tool for MART (MDI Gurgaon's student-run campus store) to track merchandise
 inventory and handovers. Replaces the Excel "working file" used for the 2026 batch T-shirts.
-Agreed with George on 2026-11-19.
+Agreed with Oliver on 2026-11-19.
 
 ## Why (what broke in Excel)
 From `MART Tshirt Working File.xlsx` and `Batch Tshirts form (Responses).xlsx` (local, not in repo):
@@ -40,7 +40,7 @@ Supabase row-level security, not just the UI.
 
 | Role | Can do |
 |---|---|
-| Super admin (`main_admin`) | Everything; adds and removes anyone. George for now |
+| Super admin (`main_admin`) | Everything; adds and removes anyone. Oliver for now |
 | Admin | Imports, edit orders/products, undo handovers, delete shirts; adds admins/ops and changes their roles (cannot touch a super admin or remove members) |
 | Ops | Receive stock from the vendor, handovers, exports (incl. emails for "come collect" mails), notes. Cannot delete |
 
