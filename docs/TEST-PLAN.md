@@ -70,3 +70,26 @@ added on Team & roles). Devices: one Android phone (Chrome), one laptop.
 - Products → close the "TEST – delete me" round (an admin can delete its shirts).
 - Super admin removes the test Admin / Ops on Team & roles.
 - GitHub → Actions → "Keep Supabase awake" → Run workflow → green.
+
+## Results — 2026-11-19 (first prod run)
+
+**Database rules on the live project: 27 / 27 passed.** Run as one transaction that is always rolled back
+(simulated Ops / Admin / non-member / anon users via JWT claims); afterwards 0 test rows remained.
+Covered: sign-up gate, anon and non-member see nothing, Ops cannot delete items/products, change roles, add members,
+edit anything but status, or write the log; no handover before arrival, no double handover, Ops cannot undo,
+undo needs a reason, admin undo restores "In MART"; 6 audit rows per item with the right names; audit log append-only
+(even for the owner); admin cannot create a super admin; product with orders cannot be deleted.
+
+**App flows on the live site as George (super admin), in round "TEST – delete me":** all passed and matched the database.
+- Products: new round + product (B-equivalent).
+- Add orders → One order by hand: TEST-001 (2 items), TEST-002 (1 item).
+- Receive stock: ticked M and S only → "2 Grey items marked as arrived".
+- Exports: Ready to collect = TEST-002 only; with the partly-ready toggle = both (TEST-001 "1 still with vendor"); Not arrived = TEST-001 L. (D1, D4)
+- Handover desk: single item → no checkbox, one tap "<name> is taking it" (C2); friend handover saved roll in capitals (C3); search cleared after each.
+- Undo as super admin: button disabled until a reason is typed; item back to In MART (C6).
+- Activity: every step listed in plain words with George's name and the undo reason (E1); DB cross-check matched.
+- Round closed afterwards (data kept; audit log is append-only by design).
+
+**Not yet run (needs people / devices):** A3 WhatsApp link, A4–A7 with real Admin/Ops accounts, C4/C5/C7 on two phones,
+D2 Gmail Bcc paste, D3 CSV on Android, F1–F4 Android Chrome, B1–B3 with the real 2026 CSV.
+Small finding: items added by hand show "(import)" in Activity because they go through the import function — cosmetic.
