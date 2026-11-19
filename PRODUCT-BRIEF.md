@@ -88,3 +88,10 @@ site; the service-role key never in the repo.
 - Every status change and handover shows in the activity log with the user's name.
 - Ops can export "arrived, not collected" roll numbers in under 3 taps.
 - An Ops user cannot delete or change roles (checked against the database, not only the UI).
+
+## Accounts (set up 2026-11-19)
+- GitHub: private repo https://github.com/oliverjoelg/mart-orders
+- Supabase: org **MART MDI** (Free), project **mart-orders**, region South Asia (Mumbai) ap-south-1,
+  "Enable RLS on new tables automatically" on. Project URL and publishable key are in `.env.example`.
+- Still to do: Google sign-in provider in Supabase Auth (needs a Google Cloud OAuth client),
+  GitHub Pages deploy, weekly keep-awake job.
