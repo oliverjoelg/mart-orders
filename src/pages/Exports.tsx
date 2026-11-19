@@ -32,7 +32,7 @@ export default function Exports() {
     <div className="page">
       <PageHead
         title="Exports"
-        sub="Pick a list, then copy the emails into Bcc of your “come collect your shirt” mail."
+        sub="Pick a list, then copy the emails into Bcc of your “come collect your item” mail."
       />
 
       <div className="stack">
@@ -48,7 +48,7 @@ export default function Exports() {
             <div>
               <div className="stat-value">{plural(lines.length, 'student')}</div>
               <div className="hint">
-                {plural(shirts, 'shirt')}
+                {plural(shirts, 'item')}
                 {noEmail > 0 && ` · ${noEmail} without an email`}
                 {campaign && ` · ${campaign.name}`}
               </div>
@@ -57,7 +57,7 @@ export default function Exports() {
               <Switch
                 checked={!!f.includePartly}
                 onChange={(v) => setF({ ...f, includePartly: v })}
-                label="Also students with only some shirts ready"
+                label="Also students with only some items ready"
               />
             )}
           </div>
@@ -83,8 +83,8 @@ export default function Exports() {
           {kind === 'call_list' && (
             <span className="hint">
               {f.includePartly
-                ? 'Students with at least one shirt ready, even if their other shirts have not arrived.'
-                : 'Students whose shirts have ALL arrived, so they only need to come once.'}
+                ? 'Students with at least one item ready, even if their other items have not arrived.'
+                : 'Students whose items have ALL arrived, so they only need to come once.'}
             </span>
           )}
         </div>
@@ -119,7 +119,7 @@ export default function Exports() {
         {lines.length === 0 ? (
           <div className="card">
             <Empty icon={<Send size={20} />} title="Nobody in this list">
-              {kind === 'call_list' ? 'No shirts are waiting in MART for these filters.' : 'Try other filters.'}
+              {kind === 'call_list' ? 'No items are waiting in MART for these filters.' : 'Try other filters.'}
             </Empty>
           </div>
         ) : (
@@ -129,7 +129,7 @@ export default function Exports() {
                 <tr>
                   <th>Roll no.</th>
                   <th>Name</th>
-                  <th>Shirts</th>
+                  <th>Items</th>
                   <th>Email</th>
                   <th>Section</th>
                   {kind === 'call_list' && <th className="right">Still with vendor</th>}

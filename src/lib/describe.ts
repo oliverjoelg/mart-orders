@@ -16,10 +16,10 @@ const str = (v: unknown) => (v === null || v === undefined || v === '' ? '—' :
 
 function shirt(ctx: DescribeCtx, row: Row | null, itemId: string | null): string {
   const src = (row && row.product_id ? row : itemId ? ctx.itemLookup(itemId) : undefined) as Row | undefined
-  if (!src) return 'a shirt'
+  if (!src) return 'a item'
   const p = ctx.productsById.get(String(src.product_id))
   const b = ctx.buyersById.get(String(src.buyer_id))
-  return `${p?.colour ?? 'Shirt'} ${str(src.size)}${b ? ` (${b.roll_no})` : ''}`
+  return `${p?.colour ?? 'Item'} ${str(src.size)}${b ? ` (${b.roll_no})` : ''}`
 }
 
 export function describeEntry(e: AuditEntry, ctx: DescribeCtx): { text: string; tone: Tone } {
@@ -76,6 +76,7 @@ export function describeEntry(e: AuditEntry, ctx: DescribeCtx): { text: string; 
     case 'campaigns':
       return { text: `${e.action === 'INSERT' ? 'created' : e.action === 'DELETE' ? 'deleted' : 'edited'} sales round ${str(n.name ?? o.name)}`, tone: '' }
     case 'imports':
+      if (n.file_name === 'Manual entry') return { text: 'added an order by hand', tone: 'green' }
       return { text: `imported ${str(n.file_name)} (${str(n.responses)} responses)`, tone: 'green' }
     case 'spare_stock': {
       const p = ctx.productsById.get(String(n.product_id ?? o.product_id))

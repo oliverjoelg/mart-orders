@@ -63,7 +63,7 @@ export default function Handover() {
   const student = buyerId ? students.get(buyerId) : undefined
   const waiting = useMemo(() => [...students.values()].filter((s) => s.ready > 0).length, [students])
 
-  // default selection: every shirt that is in MART
+  // default selection: every item that is in MART
   useEffect(() => {
     setChosen(new Set(student?.items.filter((i) => i.status === 'received').map((i) => i.id) ?? []))
   }, [buyerId]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -96,7 +96,7 @@ export default function Handover() {
     <div className="page narrow">
       <PageHead
         title="Handover desk"
-        sub={`${plural(waiting, 'student')} with shirts waiting in MART`}
+        sub={`${plural(waiting, 'student')} with items waiting in MART`}
         hideTitleOnMobile
       />
 
@@ -222,11 +222,11 @@ export default function Handover() {
 
           {readyCount > 1 && can(role, 'handover') && (
             <div className="hint" style={{ padding: '0 16px 10px' }}>
-              All ready shirts are ticked. Untick any they are not taking today.
+              All ready items are ticked. Untick any they are not taking today.
             </div>
           )}
           {sorted.map((i) => {
-            // with a single ready shirt there is nothing to choose, so no checkbox
+            // with a single ready item there is nothing to choose, so no checkbox
             const selectable = i.status === 'received' && can(role, 'handover') && readyCount > 1
             const on = chosen.has(i.id) && selectable
             return (
@@ -281,14 +281,14 @@ export default function Handover() {
             {can(role, 'handover') && student.ready > 0 ? (
               <button className="btn btn-primary btn-lg" style={{ flex: 1 }} disabled={chosenItems.length === 0} onClick={() => setConfirm(true)}>
                 <PackageCheck size={18} />
-                {chosenItems.length === 0 ? 'Tick a shirt to hand over' : `Hand over ${plural(chosenItems.length, 'shirt')}`}
+                {chosenItems.length === 0 ? 'Tick a item to hand over' : `Hand over ${plural(chosenItems.length, 'item')}`}
               </button>
             ) : (
               <div className="muted" style={{ flex: 1, alignSelf: 'center' }}>
                 {student.ready === 0 && student.pending > 0
-                  ? 'Their shirts have not arrived yet. Nothing to hand over.'
+                  ? 'Their items have not arrived yet. Nothing to hand over.'
                   : student.ready === 0
-                    ? 'They have already taken all their shirts.'
+                    ? 'They have already taken all their items.'
                     : 'Your role can see handovers but not record them.'}
               </div>
             )}
@@ -341,7 +341,7 @@ function ConfirmHandover({
   const [roll, setRoll] = useState('')
   const [busy, setBusy] = useState(false)
   const who = student.buyer.name || student.buyer.roll_no
-  const shirts = plural(items.length, 'shirt')
+  const shirts = plural(items.length, 'item')
   const them = items.length === 1 ? 'it' : 'them'
 
   const submit = async (type: 'self' | 'collected_by_other') => {
@@ -365,7 +365,7 @@ function ConfirmHandover({
   }
 
   return (
-    <Modal title={items.length === 1 ? 'Who is taking the shirt?' : 'Who is taking the shirts?'} onClose={onClose}>
+    <Modal title={items.length === 1 ? 'Who is taking the item?' : 'Who is taking the items?'} onClose={onClose}>
       <div className="hint">{items.map((i) => `${i.product.colour} ${i.size}`).join(' · ')}</div>
       {!other ? (
         <>
@@ -380,7 +380,7 @@ function ConfirmHandover({
         <>
           <div className="callout">
             <Users size={15} />
-            <div>Write down the friend's name and roll number, so we know who took {who}'s shirts.</div>
+            <div>Write down the friend's name and roll number, so we know who took {who}'s items.</div>
           </div>
           <div className="grid-2" style={{ gap: 10 }}>
             <div className="field">

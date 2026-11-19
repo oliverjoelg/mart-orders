@@ -15,7 +15,7 @@ export interface ExportFilters {
   size?: string
   batch?: string
   section?: string
-  /** call list only: also include students for whom only some shirts have arrived */
+  /** call list only: also include students for whom only some items have arrived */
   includePartly?: boolean
 }
 
@@ -26,10 +26,10 @@ export interface ExportLine {
   phone: string | null
   batch: string | null
   section: string | null
-  /** e.g. "Navy Blue M ×2, Black L" — the shirts this line is about */
+  /** e.g. "Navy Blue M ×2, Black L" — the items this line is about */
   shirts: string
   count: number
-  /** shirts of this student still with the vendor (call list) */
+  /** items of this student still with the vendor (call list) */
   pending: number
   /** collected: who handed it over and who collected */
   handedBy?: string
@@ -60,9 +60,9 @@ export function summariseShirts(items: ItemView[]): string {
 
 /**
  * One line per student.
- *  call_list   — has shirts in MART (received) not yet collected. Unless includePartly is on,
- *                students who still have shirts with the vendor are left out (call them once).
- *  not_arrived — has shirts still ordered / with the vendor.
+ *  call_list   — has items in MART (received) not yet collected. Unless includePartly is on,
+ *                students who still have items with the vendor are left out (call them once).
+ *  not_arrived — has items still ordered / with the vendor.
  *  collected   — has collected shirts, with who handed over and who collected.
  */
 export function buildExport(
@@ -139,7 +139,7 @@ export function emailList(lines: ExportLine[]): string {
 }
 
 export function exportRows(lines: ExportLine[], kind: ExportKind): (string | number)[][] {
-  const head = ['Roll number', 'Name', 'Email', 'Phone', 'Batch', 'Section', 'Shirts', 'Count']
+  const head = ['Roll number', 'Name', 'Email', 'Phone', 'Batch', 'Section', 'Items', 'Count']
   if (kind === 'call_list') head.push('Still with vendor')
   if (kind === 'collected') head.push('Handed over by', 'Collected by')
   return [

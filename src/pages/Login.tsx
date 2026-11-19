@@ -56,10 +56,10 @@ export default function Login() {
           <GoogleG />
           {api.mode === 'demo' ? 'Enter demo' : 'Sign in with Google'}
         </button>
-        <div className="row hint" style={{ justifyContent: 'center' }}>
-          <ShieldCheck size={14} />
+        <p className="hint" style={{ margin: 0 }}>
+          <ShieldCheck size={13} style={{ verticalAlign: -2, marginRight: 5 }} />
           MART team only · @mdi.ac.in accounts on the team list
-        </div>
+        </p>
       </div>
     </div>
   )

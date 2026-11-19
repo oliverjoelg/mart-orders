@@ -29,7 +29,7 @@ export function UndoHandoverModal({ item, onClose, onDone }: { item: ItemView; o
     setBusy(true)
     try {
       await api.undoHandover(item.id, reason)
-      toast.ok('Handover undone. The shirt is back on the shelf.')
+      toast.ok('Handover undone. The item is back on the shelf.')
       onDone()
     } catch (e) {
       toast.err(friendlyError(e))
@@ -123,12 +123,12 @@ function ItemDrawerInner({ item, onClose }: { item: ItemView; onClose(): void })
             className="btn btn-danger"
             disabled={busy}
             onClick={() => {
-              if (window.confirm(`Delete this shirt (${item.product.colour} ${item.size}, ${item.buyer.roll_no})? The activity log keeps a copy.`)) {
-                void run(() => api.deleteItem(item.id), 'Shirt deleted').then(onClose)
+              if (window.confirm(`Delete this item (${item.product.colour} ${item.size}, ${item.buyer.roll_no})? The activity log keeps a copy.`)) {
+                void run(() => api.deleteItem(item.id), 'Item deleted').then(onClose)
               }
             }}
           >
-            <Trash2 size={14} /> Delete shirt
+            <Trash2 size={14} /> Delete item
           </button>
         ) : undefined
       }
@@ -168,7 +168,7 @@ function ItemDrawerInner({ item, onClose }: { item: ItemView; onClose(): void })
           </>
         )}
         <dt>Ordered</dt>
-        <dd>{formatDateTime(item.source_timestamp)} {item.source_slot ? <span className="subtle">· shirt {item.source_slot} on the form</span> : null}</dd>
+        <dd>{formatDateTime(item.source_timestamp)} {item.source_slot ? <span className="subtle">· item {item.source_slot} on the form</span> : null}</dd>
       </dl>
 
       {can(role, 'setStatus') && item.status !== 'handed_over' && (
@@ -186,7 +186,7 @@ function ItemDrawerInner({ item, onClose }: { item: ItemView; onClose(): void })
               </button>
             ))}
           </div>
-          <span className="hint">Hand shirts over from the Handover desk.</span>
+          <span className="hint">Hand items over from the Handover desk.</span>
         </div>
       )}
       {item.status === 'handed_over' && can(role, 'undoHandover') && (
@@ -197,7 +197,7 @@ function ItemDrawerInner({ item, onClose }: { item: ItemView; onClose(): void })
 
       {can(role, 'editItem') && (
         <details className="disclosure">
-          <summary>Edit shirt details</summary>
+          <summary>Edit item details</summary>
           <div className="stack-sm" style={{ marginTop: 12 }}>
             <div className="grid-2" style={{ gap: 10 }}>
               <div className="field">
@@ -234,7 +234,7 @@ function ItemDrawerInner({ item, onClose }: { item: ItemView; onClose(): void })
                       batch: edit.batch.trim() || null,
                       product_id: edit.product_id,
                     }),
-                  'Shirt updated',
+                  'Item updated',
                 )
               }
             >
@@ -254,7 +254,7 @@ function ItemDrawerInner({ item, onClose }: { item: ItemView; onClose(): void })
         ))}
         {can(role, 'notes') && (
           <div className="row" style={{ flexWrap: 'nowrap' }}>
-            <input className="input" value={note} placeholder="Add a note about this shirt" onChange={(e) => setNote(e.target.value)} />
+            <input className="input" value={note} placeholder="Add a note about this item" onChange={(e) => setNote(e.target.value)} />
             <button
               className="btn"
               disabled={!note.trim() || busy}

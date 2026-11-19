@@ -162,6 +162,15 @@ export function createSupabaseApi(): Api {
       else check(await sb.from('products').insert(rest))
     },
 
+    async deleteProduct(id) {
+      const res = await sb.from('products').delete().eq('id', id).select('id')
+      if (res.error) {
+        if (/foreign key/i.test(res.error.message)) throw new Error('This product has orders, so it can’t be deleted. Close its sales round instead.')
+        throw new Error(res.error.message)
+      }
+      if ((res.data ?? []).length === 0) throw new Error("Your role isn't allowed to delete products.")
+    },
+
     async saveCampaign(c) {
       const { id, ...rest } = c
       if (id) check(await sb.from('campaigns').update(rest).eq('id', id))

@@ -56,22 +56,22 @@ export default function Overview() {
 
       <div className="stack">
         <div className="stats">
-          <Stat label="Shirts ordered" value={inv.total.ordered} icon={<Shirt size={14} />} sub={`${plural(products.length, 'product')}`} />
+          <Stat label="Items ordered" value={inv.total.ordered} icon={<Shirt size={14} />} sub={`${plural(products.length, 'product')}`} />
           <Stat label="With vendor" value={inv.total.withVendor} icon={<Truck size={14} />} sub="ordered or sent, not here yet" />
           <Stat label="On the shelf" value={inv.total.onShelf} icon={<Warehouse size={14} />} accent sub={`${inv.total.spare} spare`} />
           <Stat
             label="Handed over"
             value={inv.total.handedOver}
             icon={<PackageCheck size={14} />}
-            sub={`${Math.round((inv.total.handedOver / total) * 100)}% of all shirts`}
+            sub={`${Math.round((inv.total.handedOver / total) * 100)}% of all items`}
           />
-          <Stat label="Students to call" value={callList.length} icon={<Flag size={14} />} sub="all their shirts are in MART" />
+          <Stat label="Students to call" value={callList.length} icon={<Flag size={14} />} sub="all their items are in MART" />
         </div>
 
         <div className="card card-pad stack-sm">
           <div className="row between">
-            <span className="label">Where every shirt is</span>
-            <span className="hint">{plural(items.length, 'shirt')}</span>
+            <span className="label">Where every item is</span>
+            <span className="hint">{plural(items.length, 'item')}</span>
           </div>
           <div className="progress" aria-hidden>
             {byStatus.map(({ s, n }) =>

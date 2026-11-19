@@ -13,7 +13,7 @@ import { useData } from '../lib/store'
 type Metric = keyof GridCell
 
 const METRICS: { value: Metric; label: string; status?: string; hint: string }[] = [
-  { value: 'ordered', label: 'Ordered', hint: 'Every shirt ordered, whatever its status.' },
+  { value: 'ordered', label: 'Ordered', hint: 'Every item ordered, whatever its status.' },
   { value: 'withVendor', label: 'With vendor', hint: 'Ordered or sent to the vendor; not in MART yet.' },
   { value: 'arrived', label: 'Arrived', hint: 'Received from the vendor (on the shelf + handed over).' },
   { value: 'onShelf', label: 'On shelf', status: 'received', hint: 'In MART, waiting for the student.' },
@@ -57,7 +57,7 @@ export default function Inventory() {
 
   return (
     <div className="page">
-      <PageHead title="Inventory" sub="Product × size. Click a number to see those shirts." />
+      <PageHead title="Inventory" sub="Product × size. Click a number to see those items." />
 
       <div className="stack">
         <div className="stats">
