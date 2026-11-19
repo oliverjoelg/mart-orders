@@ -55,9 +55,25 @@ begin
     raise exception 'MART Orders: % is not on the MART team list', coalesce(new.email, '(no email)')
       using errcode = '42501';
   end if;
+  update public.members set user_id = new.id
+   where email = lower(btrim(new.email)) and user_id is null;
   return new;
 end;
 $$;
+
+-- Called by the app after sign-in, in case the member row was re-created after sign-up.
+create or replace function public.link_my_member()
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.members set user_id = auth.uid()
+   where active and email = lower(coalesce(auth.jwt() ->> 'email', ''))
+     and user_id is distinct from auth.uid();
+$$;
+revoke all on function public.link_my_member() from public, anon;
+grant execute on function public.link_my_member() to authenticated;
 
 create trigger enforce_member_signup
   before insert on auth.users

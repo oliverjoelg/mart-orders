@@ -123,8 +123,18 @@ describe('sign-in gate', () => {
     const msg = await fails(db.query(`insert into auth.users (email) values ('random@gmail.com')`))
     expect(msg).toMatch(/not on the MART team list/)
   })
-  it('lets a team member sign up', async () => {
+  it('lets a team member sign up and links their member row', async () => {
     await db.query(`insert into auth.users (email) values ('OPS@mdi.ac.in')`)
+    const r = await db.query<{ ok: boolean }>(
+      `select m.user_id = u.id as ok from public.members m join auth.users u on lower(u.email) = m.email
+        where m.email = 'ops@mdi.ac.in'`,
+    )
+    expect(r.rows[0].ok).toBe(true)
+  })
+  it('link_my_member sets user_id from the JWT', async () => {
+    await as('admin', `select public.link_my_member()`)
+    const r = await db.query<{ user_id: string }>(`select user_id from public.members where email = 'admin@mdi.ac.in'`)
+    expect(r.rows[0].user_id).toBe(USERS.admin.sub)
   })
   it('only accepts @mdi.ac.in emails on the team list', async () => {
     const msg = await fails(as('main', `insert into public.members (email, display_name) values ('x@gmail.com', 'X')`))
@@ -144,6 +154,20 @@ describe('who can see data', () => {
       db.transaction(async (tx) => {
         await tx.exec('set local role anon')
         await tx.query('select * from public.order_items')
+      }),
+    )
+    expect(msg).toMatch(/permission denied/)
+  })
+  it('anon can call ping (keep-alive) and nothing else', async () => {
+    const r = await db.transaction(async (tx) => {
+      await tx.exec('set local role anon')
+      return tx.query<{ ping: string }>('select public.ping()')
+    })
+    expect(r.rows[0].ping).toBe('ok')
+    const msg = await fails(
+      db.transaction(async (tx) => {
+        await tx.exec('set local role anon')
+        await tx.query(`select public.set_items_status('{}', 'received')`)
       }),
     )
     expect(msg).toMatch(/permission denied/)

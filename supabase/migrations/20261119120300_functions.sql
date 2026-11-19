@@ -159,6 +159,20 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------------------
+-- Weekly keep-alive from GitHub Actions so the free project isn't paused between drops.
+-- Returns a constant; reads no data. The only thing anon may call.
+create or replace function public.ping()
+returns text
+language sql
+stable
+set search_path = ''
+as $$
+  select 'ok'::text;
+$$;
+revoke all on function public.ping() from public;
+grant execute on function public.ping() to anon, authenticated;
+
 revoke all on function public.set_items_status(uuid[], public.item_status) from public, anon;
 revoke all on function public.record_handover(uuid[], public.handover_type, text, text) from public, anon;
 revoke all on function public.undo_handover(uuid, text) from public, anon;

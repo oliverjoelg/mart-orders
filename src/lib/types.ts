@@ -24,6 +24,8 @@ export interface Member {
   display_name: string
   role: Role
   active: boolean
+  /** auth user id, set at first sign-in */
+  user_id?: string | null
   created_at?: string
 }
 

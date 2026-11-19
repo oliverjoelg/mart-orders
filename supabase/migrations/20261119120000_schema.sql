@@ -27,6 +27,7 @@ create table public.members (
   display_name  text not null check (btrim(display_name) <> ''),
   role          public.app_role not null default 'ops',
   active        boolean not null default true,
+  user_id       uuid unique,  -- auth.users id, set at first sign-in (used to show names)
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
