@@ -274,7 +274,7 @@ describe('deleting products', () => {
 
 describe('roles', () => {
   it('there is no separate IT role any more (merged into admin)', async () => {
-    const r = await db.query<{ v: string }>(`select unnest(enum_range(null::public.app_role))::text as v`)
+    const r = await db.query<{ v: string }>(`select key as v from public.roles order by sort_order`)
     expect(r.rows.map((x) => x.v)).toEqual(['main_admin', 'admin', 'ops'])
   })
   it('the super admin can add, change and remove admins and ops', async () => {
@@ -346,7 +346,7 @@ describe('handovers', () => {
   })
   it('Ops cannot undo a handover; admins can, with a reason', async () => {
     const msg = await fails(as('ops', `select public.undo_handover($1, 'mistake')`, [itemId]))
-    expect(msg).toMatch(/Only admins/)
+    expect(msg).toMatch(/cannot undo/)
     const noReason = await fails(as('admin', `select public.undo_handover($1, '  ')`, [itemId]))
     expect(noReason).toMatch(/reason/)
     await as('admin', `select public.undo_handover($1, 'Wrong student')`, [itemId])
@@ -393,6 +393,93 @@ describe('audit log', () => {
 describe('main admin safety', () => {
   it('the last main admin cannot be demoted', async () => {
     const msg = await fails(as('main', `update public.members set role = 'admin' where email = 'main@mdi.ac.in'`))
-    expect(msg).toMatch(/at least one active main admin/)
+    expect(msg).toMatch(/at least one active super admin/)
+  })
+})
+
+
+describe('roles & permissions (configurable)', () => {
+  it('a new role gets exactly the ticked permissions', async () => {
+    await as('main', `insert into public.roles (key, name) values ('volunteer', 'Volunteer')`)
+    await as('main', `insert into public.role_permissions (role_key, permission) values ('volunteer', 'hand_over')`)
+    await as('main', `insert into public.members (email, display_name, role) values ('vol@mdi.ac.in', 'Vol', 'volunteer')`)
+    const can = async (p: string) =>
+      (
+        await db.transaction(async (tx) => {
+          await tx.query(`select set_config('request.jwt.claims', $1, true)`, [
+            JSON.stringify({ sub: '00000000-0000-0000-0000-0000000000aa', email: 'vol@mdi.ac.in', role: 'authenticated' }),
+          ])
+          await tx.exec('set local role authenticated')
+          return tx.query<{ ok: boolean }>(`select public.has_perm($1) as ok`, [p])
+        })
+      ).rows[0].ok
+    expect(await can('hand_over')).toBe(true)
+    expect(await can('receive_stock')).toBe(false)
+    expect(await can('delete_items')).toBe(false)
+  })
+  it('unticking a permission takes effect in the database', async () => {
+    await as('main', `delete from public.role_permissions where role_key = 'ops' and permission = 'spare_stock'`)
+    const msg = await fails(as('ops', `insert into public.spare_stock (product_id, size, quantity) values ($1, 'M', 2)`, [productId]))
+    expect(msg).toMatch(/row-level security/)
+    await as('main', `insert into public.role_permissions (role_key, permission) values ('ops', 'spare_stock')`)
+    await as('ops', `insert into public.spare_stock (product_id, size, quantity) values ($1, 'M', 2)`, [productId])
+  })
+  it('only the super admin can change permissions or roles', async () => {
+    const msg = await fails(as('admin', `insert into public.role_permissions (role_key, permission) values ('admin', 'remove_members')`))
+    expect(msg).toMatch(/row-level security/)
+    const msg2 = await fails(as('admin', `insert into public.roles (key, name) values ('boss', 'Boss')`))
+    expect(msg2).toMatch(/row-level security/)
+  })
+  it('the super admin role cannot be deleted or edited', async () => {
+    expect(await fails(as('main', `delete from public.roles where key = 'main_admin'`))).toMatch(/cannot be deleted/)
+    expect(await fails(as('main', `update public.roles set is_super = false where key = 'main_admin'`))).toMatch(/cannot be changed/)
+  })
+  it('a role with members cannot be deleted', async () => {
+    expect(await fails(as('main', `delete from public.roles where key = 'volunteer'`))).toMatch(/foreign key/)
+  })
+})
+
+describe('locked sales rounds', () => {
+  let lockedCampaign: string
+  beforeAll(async () => {
+    const c = await db.query<{ id: string }>(`insert into public.campaigns (name) values ('Old Round') returning id`)
+    lockedCampaign = c.rows[0].id
+    const p = await db.query<{ id: string }>(
+      `insert into public.products (campaign_id, name, colour, price_inr) values ($1, 'Old Tee', 'Red', 1) returning id`,
+      [lockedCampaign],
+    )
+    await db.query(
+      `insert into public.order_items (campaign_id, buyer_id, product_id, size)
+       select $1, b.id, $2, 'M' from public.buyers b where b.roll_no = 'PGP26-002'`,
+      [lockedCampaign, p.rows[0].id],
+    )
+  })
+  it('only a super admin can lock a round', async () => {
+    expect(await fails(as('admin', `update public.campaigns set locked = true where id = $1`, [lockedCampaign]))).toMatch(/super admin/)
+    await as('main', `update public.campaigns set locked = true where id = $1`, [lockedCampaign])
+  })
+  it('a locked round is hidden from everyone except super admins', async () => {
+    const seen = async (who: 'admin' | 'ops' | 'main') => {
+      const c = await as<{ n: number }>(who, `select count(*)::int as n from public.campaigns where id = $1`, [lockedCampaign])
+      const i = await as<{ n: number }>(who, `select count(*)::int as n from public.order_items where campaign_id = $1`, [lockedCampaign])
+      return [c.rows[0].n, i.rows[0].n]
+    }
+    expect(await seen('admin')).toEqual([0, 0])
+    expect(await seen('ops')).toEqual([0, 0])
+    expect(await seen('main')).toEqual([1, 1])
+  })
+  it('its activity-log entries are hidden too', async () => {
+    const a = await as<{ n: number }>('admin', `select count(*)::int as n from public.audit_log where item_id in (select id from public.order_items where campaign_id = $1)`, [lockedCampaign])
+    expect(a.rows[0].n).toBe(0)
+  })
+  it('a locked round is frozen, even for the super admin', async () => {
+    const msg = await fails(as('main', `update public.order_items set size = 'L' where campaign_id = $1`, [lockedCampaign]))
+    expect(msg).toMatch(/locked/)
+    expect(await fails(as('main', `update public.campaigns set name = 'Renamed' where id = $1`, [lockedCampaign]))).toMatch(/locked/)
+  })
+  it('unlocking brings it back for everyone', async () => {
+    await as('main', `update public.campaigns set locked = false where id = $1`, [lockedCampaign])
+    const c = await as<{ n: number }>('ops', `select count(*)::int as n from public.campaigns where id = $1`, [lockedCampaign])
+    expect(c.rows[0].n).toBe(1)
   })
 })

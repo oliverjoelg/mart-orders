@@ -4,7 +4,46 @@
  * It mimics the database rules loosely; the real enforcement is in the SQL migrations.
  */
 import type { Api, ImportArgs, Snapshot } from './api'
-import { can } from './permissions'
+import { can, isSuperRole, type PermissionRow, type RolePermissionRow, type RoleRow } from './permissions'
+
+// Same defaults as migration 20261119120800 (the real list lives in the database).
+const DEMO_ROLES: RoleRow[] = [
+  { key: 'main_admin', name: 'Super admin', is_super: true, sort_order: 0 },
+  { key: 'admin', name: 'Admin', is_super: false, sort_order: 1 },
+  { key: 'ops', name: 'Ops', is_super: false, sort_order: 2 },
+]
+const DEMO_PERMISSIONS: PermissionRow[] = [
+  ['receive_stock', 'Receive stock / change status', 'Mark items as with the vendor, arrived in MART, or back to ordered'],
+  ['hand_over', 'Hand over items', 'Use the handover desk'],
+  ['undo_handover', 'Undo a handover', 'Needs a reason; the item goes back on the shelf'],
+  ['add_orders', 'Add orders', 'Upload the order file or add an order by hand'],
+  ['edit_items', 'Edit item details', 'Change product, size, back name or batch of an item'],
+  ['delete_items', 'Delete items', null],
+  ['manage_products', 'Manage sales rounds & products', 'Create rounds, add, edit and delete products'],
+  ['spare_stock', 'Edit spare stock', null],
+  ['add_notes', 'Add notes & flags', null],
+  ['resolve_flags', 'Mark flags as sorted', null],
+  ['manage_team', 'Add team members & set roles', 'Cannot touch super admins'],
+  ['remove_members', 'Remove team members', 'Cannot remove super admins'],
+].map(([key, label, hint], i): PermissionRow => ({ key: key!, label: label!, hint, kind: 'action', sort_order: (i + 1) * 10 }))
+  .concat(
+    [
+      ['page_home', 'Home', null],
+      ['page_desk', 'Handover desk', 'Search students and see their items'],
+      ['page_lists', 'Student lists', 'Call lists, emails, CSV'],
+      ['page_items', 'Items', null],
+      ['page_inventory', 'Inventory', null],
+      ['page_print_list', 'Vendor print list', null],
+      ['page_activity', 'Activity', null],
+      ['page_products', 'Products', null],
+    ].map(([key, label, hint], i): PermissionRow => ({ key: key!, label: label!, hint, kind: 'page', sort_order: 200 + i * 10 })),
+  )
+const DEMO_ROLE_PERMS: RolePermissionRow[] = [
+  ...DEMO_PERMISSIONS.filter((p) => p.key !== 'remove_members').map((p) => ({ role_key: 'admin', permission: p.key })),
+  ...DEMO_PERMISSIONS.filter(
+    (p) => p.kind === 'page' || ['receive_stock', 'hand_over', 'spare_stock', 'add_notes', 'resolve_flags'].includes(p.key),
+  ).map((p) => ({ role_key: 'ops', permission: p.key })),
+]
 import type {
   AuditEntry,
   Buyer,
@@ -146,7 +185,13 @@ function build(): { db: Snapshot; log: AuditEntry[] } {
     log.push(entry(++logId, h.handed_at, m, 'UPDATE', 'order_items', it.id, it.id, { ...it, status: 'received' },
       { ...it }, ['status']))
   }
-  return { db: { campaigns: [campaign], products, buyers, items, handovers, notes, spare, members: DEMO_MEMBERS }, log }
+  return {
+    db: {
+      campaigns: [campaign], products, buyers, items, handovers, notes, spare, members: DEMO_MEMBERS,
+      roles: structuredClone(DEMO_ROLES), permissions: DEMO_PERMISSIONS, rolePermissions: structuredClone(DEMO_ROLE_PERMS),
+    },
+    log,
+  }
 }
 
 function entry(
@@ -232,7 +277,15 @@ export function createDemoApi(): Api {
 
     async loadSnapshot() {
       await delay(200)
-      return clone({ ...db, handovers: db.handovers.filter((h) => !h.undone_at) })
+      // like the database: locked rounds are invisible to anyone but super admins
+      const hidden = new Set(isSuperRole(role) ? [] : db.campaigns.filter((c) => c.locked).map((c) => c.id))
+      return clone({
+        ...db,
+        campaigns: db.campaigns.filter((c) => !hidden.has(c.id)),
+        products: db.products.filter((p) => !hidden.has(p.campaign_id)),
+        items: db.items.filter((i) => !hidden.has(i.campaign_id)),
+        handovers: db.handovers.filter((h) => !h.undone_at),
+      })
     },
 
     async setItemsStatus(ids, status) {
@@ -389,9 +442,9 @@ export function createDemoApi(): Api {
 
     async deleteMember(id) {
       await delay()
-      if (role !== 'main_admin') throw new Error('Only the super admin can remove team members.')
       const i = db.members.findIndex((m) => m.id === id)
       const m = db.members[i]
+      if (!(isSuperRole(role) || (can(role, 'removeMembers') && !isSuperRole(m.role)))) throw new Error("Your role can't remove this member.")
       if (m.role === 'main_admin' && db.members.filter((x) => x.role === 'main_admin' && x.active).length <= 1) {
         throw new Error('There must always be at least one active super admin')
       }
@@ -433,8 +486,49 @@ export function createDemoApi(): Api {
       await delay()
       if (!can(role, 'editProducts')) deny()
       const existing = db.campaigns.find((x) => x.id === c.id)
+      if (existing?.locked) throw new Error('This sales round is locked. A super admin must unlock it first.')
       if (existing) Object.assign(existing, c)
-      else db.campaigns.push({ id: uid('c'), name: c.name, is_active: c.is_active })
+      else db.campaigns.push({ id: uid('c'), name: c.name, is_active: c.is_active, locked: false })
+    },
+
+    async setCampaignLocked(id, locked) {
+      await delay()
+      if (!isSuperRole(role)) throw new Error('Only a super admin can lock or unlock a sales round')
+      const c = db.campaigns.find((x) => x.id === id)!
+      const old = { ...c }
+      c.locked = locked
+      record('UPDATE', 'campaigns', id, null, old, { ...c })
+    },
+
+    async saveRole(r) {
+      await delay()
+      if (!isSuperRole(role)) deny()
+      if (r.key) {
+        const row = db.roles.find((x) => x.key === r.key)!
+        if (row.is_super) throw new Error('The super admin role cannot be changed')
+        row.name = r.name.trim()
+        return
+      }
+      const key = r.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'role'
+      if (db.roles.some((x) => x.key === key || x.name.toLowerCase() === r.name.trim().toLowerCase())) throw new Error('That role already exists')
+      db.roles.push({ key, name: r.name.trim(), is_super: false, sort_order: 100 })
+    },
+
+    async deleteRole(key) {
+      await delay()
+      if (!isSuperRole(role)) deny()
+      const row = db.roles.find((x) => x.key === key)
+      if (row?.is_super) throw new Error('The super admin role cannot be deleted')
+      if (db.members.some((m) => m.role === key)) throw new Error('Move everyone off this role first, then delete it.')
+      db.roles = db.roles.filter((x) => x.key !== key)
+      db.rolePermissions = db.rolePermissions.filter((x) => x.role_key !== key)
+    },
+
+    async setPermission(roleKey, permission, allowed) {
+      await delay(60)
+      if (!isSuperRole(role)) deny()
+      db.rolePermissions = db.rolePermissions.filter((x) => !(x.role_key === roleKey && x.permission === permission))
+      if (allowed) db.rolePermissions.push({ role_key: roleKey, permission })
     },
   }
 }

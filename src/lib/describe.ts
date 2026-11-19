@@ -1,5 +1,5 @@
-import { STATUS_LABEL, type AuditEntry, type Buyer, type ItemStatus, type Product, type Role } from './types'
-import { ROLE_LABEL } from './types'
+import { STATUS_LABEL, type AuditEntry, type Buyer, type ItemStatus, type Product } from './types'
+import { roleName } from './permissions'
 
 export interface DescribeCtx {
   productsById: Map<string, Product>
@@ -64,16 +64,24 @@ export function describeEntry(e: AuditEntry, ctx: DescribeCtx): { text: string; 
     }
     case 'members': {
       const name = str(n.nickname ?? o.nickname ?? n.display_name ?? o.display_name)
-      if (e.action === 'INSERT') return { text: `added ${name} to the team as ${ROLE_LABEL[n.role as Role]}`, tone: 'green' }
+      if (e.action === 'INSERT') return { text: `added ${name} to the team as ${roleName(String(n.role))}`, tone: 'green' }
       if (e.action === 'DELETE') return { text: `removed ${name} from the team`, tone: 'red' }
-      if (changed.includes('role')) return { text: `changed ${name}'s role: ${ROLE_LABEL[o.role as Role]} → ${ROLE_LABEL[n.role as Role]}`, tone: 'amber' }
+      if (changed.includes('role')) return { text: `changed ${name}'s role: ${roleName(String(o.role))} → ${roleName(String(n.role))}`, tone: 'amber' }
       if (changed.includes('active')) return { text: `${n.active ? 're-activated' : 'deactivated'} ${name}`, tone: n.active ? 'green' : 'red' }
       if (changed.length === 1 && changed[0] === 'user_id') return { text: `${name} signed in for the first time`, tone: '' }
       return { text: `updated team member ${name}`, tone: '' }
     }
     case 'products':
       return { text: `${e.action === 'INSERT' ? 'added' : e.action === 'DELETE' ? 'deleted' : 'edited'} product ${str(n.name ?? o.name)}`, tone: '' }
+    case 'roles':
+      return { text: `${e.action === 'INSERT' ? 'created' : e.action === 'DELETE' ? 'deleted' : 'edited'} the role ${str(n.name ?? o.name)}`, tone: 'amber' }
+    case 'role_permissions': {
+      const r = roleName(String(n.role_key ?? o.role_key))
+      const p = String(n.permission ?? o.permission).replace(/_/g, ' ')
+      return { text: `${e.action === 'DELETE' ? 'took away' : 'gave'} “${p}” ${e.action === 'DELETE' ? 'from' : 'to'} ${r}`, tone: 'amber' }
+    }
     case 'campaigns':
+      if (e.action === 'UPDATE' && changed.includes('locked')) return { text: `${n.locked ? 'locked' : 'unlocked'} sales round ${str(n.name)}`, tone: 'amber' }
       return { text: `${e.action === 'INSERT' ? 'created' : e.action === 'DELETE' ? 'deleted' : 'edited'} sales round ${str(n.name ?? o.name)}`, tone: '' }
     case 'imports':
       if (n.file_name === 'Manual entry') return { text: 'added an order by hand', tone: 'green' }

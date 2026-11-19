@@ -1,10 +1,12 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { Layout } from './components/Layout'
+import { Layout, NAV } from './components/Layout'
 import { ToastProvider } from './components/Toast'
-import { Spinner } from './components/ui'
+import { Empty, Spinner } from './components/ui'
+import { Lock } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { Api } from './lib/api'
 import { AuthProvider, useAuth } from './lib/auth'
-import { can } from './lib/permissions'
+import { can, type Action } from './lib/permissions'
 import { DataProvider, useData } from './lib/store'
 import Activity from './pages/Activity'
 import Exports from './pages/Exports'
@@ -19,6 +21,25 @@ import PrintList from './pages/PrintList'
 import Products from './pages/Products'
 import Receive from './pages/Receive'
 import Team from './pages/Team'
+
+/** Shows a page only if the signed-in role has its tick; otherwise goes to the first page it can see. */
+function Allowed({ need, children }: { need: Action; children: ReactNode }) {
+  const { member } = useAuth()
+  useData() // re-render when roles/ticks load
+  const role = member?.role
+  if (can(role, need)) return <>{children}</>
+  const first = NAV.find((n) => !n.need || can(role, n.need))
+  if (first) return <Navigate to={first.to} replace />
+  return (
+    <div className="page narrow">
+      <Empty icon={<Lock size={20} />} title="No pages are switched on for your role">
+        Ask the MART super admin to tick some pages for your role on Roles &amp; permissions.
+      </Empty>
+    </div>
+  )
+}
+
+const allow = (need: Action, el: ReactNode) => <Allowed need={need}>{el}</Allowed>
 
 function Shell() {
   const { status, member } = useAuth()
@@ -36,17 +57,18 @@ function Shell() {
       <Layout>
         <Gate>
           <Routes>
-            <Route path="/" element={<Overview />} />
-            <Route path="/desk" element={<Handover />} />
-            <Route path="/items" element={<Items />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/print" element={<PrintList />} />
-            <Route path="/exports" element={<Exports />} />
-            <Route path="/import" element={can(member?.role, 'import') ? <Import /> : <Navigate to="/" replace />} />
-            <Route path="/activity" element={<Activity />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/receive" element={<Receive />} />
-            <Route path="/team" element={can(member?.role, 'manageMembers') ? <Team /> : <Navigate to="/" replace />} />
+            {/* each page needs its tick on Roles & permissions; the first allowed page is home */}
+            <Route path="/" element={allow('pageHome', <Overview />)} />
+            <Route path="/desk" element={allow('pageDesk', <Handover />)} />
+            <Route path="/items" element={allow('pageItems', <Items />)} />
+            <Route path="/inventory" element={allow('pageInventory', <Inventory />)} />
+            <Route path="/print" element={allow('pagePrint', <PrintList />)} />
+            <Route path="/exports" element={allow('pageLists', <Exports />)} />
+            <Route path="/import" element={allow('import', <Import />)} />
+            <Route path="/activity" element={allow('pageActivity', <Activity />)} />
+            <Route path="/products" element={allow('pageProducts', <Products />)} />
+            <Route path="/receive" element={allow('setStatus', <Receive />)} />
+            <Route path="/team" element={allow('manageMembers', <Team />)} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Gate>
@@ -56,7 +78,7 @@ function Shell() {
 }
 
 /** Shows a loader or the load error before any page renders. */
-function Gate({ children }: { children: React.ReactNode }) {
+function Gate({ children }: { children: ReactNode }) {
   const { loading, error, snapshot, refresh } = useData()
   if (loading && !snapshot) {
     return (

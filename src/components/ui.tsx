@@ -1,7 +1,8 @@
 import { X } from 'lucide-react'
 import { useEffect, type ReactNode } from 'react'
 import { initials } from '../lib/format'
-import { ROLE_LABEL, STATUS_LABEL, type ItemStatus, type Product, type Role } from '../lib/types'
+import { isSuperRole, roleName } from '../lib/permissions'
+import { STATUS_LABEL, type ItemStatus, type Product, type Role } from '../lib/types'
 
 const STATUS_CLASS: Record<ItemStatus, string> = {
   ordered: 'badge',
@@ -27,8 +28,8 @@ export function StatusBadge({ status }: { status: ItemStatus }) {
 }
 
 export function RoleBadge({ role }: { role: Role }) {
-  const cls = role === 'main_admin' ? 'badge badge-green' : role === 'admin' ? 'badge badge-blue' : 'badge'
-  return <span className={`${cls} badge-square`}>{ROLE_LABEL[role]}</span>
+  const cls = isSuperRole(role) ? 'badge badge-green' : role === 'admin' ? 'badge badge-blue' : 'badge'
+  return <span className={`${cls} badge-square`}>{roleName(role)}</span>
 }
 
 const SWATCH: Record<string, string> = {

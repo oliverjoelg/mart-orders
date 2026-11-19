@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, Info, Upload } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Info, Upload } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../components/Toast'
@@ -7,7 +7,10 @@ import { friendlyError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { plural, inr } from '../lib/format'
 import { describeColumnMap } from '../lib/import/headers'
-import { canInclude, ISSUE_LABEL, parseFormCsv, type ImportPreview, type IssueCode, type ParsedItem } from '../lib/import/parseForm'
+import { canInclude, ISSUE_LABEL, parseFormRows, type ImportPreview, type IssueCode, type ParsedItem } from '../lib/import/parseForm'
+import { buildColumnMap } from '../lib/import/headers'
+import { ACCEPTED_FILES, downloadXlsx, isSpreadsheetName, readSpreadsheet, type Sheet } from '../lib/import/readFile'
+import { buildSampleRows, sampleInstructions } from '../lib/import/sample'
 import { useData } from '../lib/store'
 import ManualOrder from './ManualOrder'
 
@@ -32,6 +35,8 @@ export default function Import() {
   const [over, setOver] = useState(false)
   const [fileName, setFileName] = useState('')
   const [preview, setPreview] = useState<ImportPreview | null>(null)
+  const [sheets, setSheets] = useState<Sheet[]>([])
+  const [sheetName, setSheetName] = useState('')
   const [include, setInclude] = useState<Record<string, boolean>>({})
   const [view, setView] = useState<View>('all')
   const [busy, setBusy] = useState(false)
@@ -52,18 +57,40 @@ export default function Import() {
     [snapshot, campaign, buyersById],
   )
 
-  const load = async (file: File) => {
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      toast.err('Choose a .csv file. In Google Sheets: File → Download → Comma-separated values.')
-      return
-    }
-    const text = await file.text()
-    const p = parseFormCsv(text, products, existing)
-    setFileName(file.name)
+  const usePreview = (sheet: Sheet, all: Sheet[], name: string) => {
+    const p = parseFormRows(sheet.rows[0] ?? [], sheet.rows.slice(1), products, existing)
+    setFileName(all.length > 1 ? `${name} (${sheet.name})` : name)
+    setSheets(all)
+    setSheetName(sheet.name)
     setPreview(p)
     setInclude(Object.fromEntries(p.items.map((i) => [i.key, i.include])))
     setView(p.items.some((i) => i.issues.length) ? 'issues' : 'all')
   }
+
+  const load = async (file: File) => {
+    if (!isSpreadsheetName(file.name)) {
+      toast.err('Choose a CSV or Excel file (.csv, .xlsx, .xls or .ods).')
+      return
+    }
+    try {
+      const all = await readSpreadsheet(file)
+      if (all.length === 0) {
+        toast.err('That file looks empty.')
+        return
+      }
+      // pick the first tab that has a roll-number column (the orders), else the first tab
+      const best = all.find((sh) => buildColumnMap(sh.rows[0] ?? []).roll !== undefined) ?? all[0]
+      usePreview(best, all, file.name)
+    } catch (e) {
+      toast.err(`Couldn't read that file: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  const downloadSample = () =>
+    void downloadXlsx(`MART order file - sample${campaign ? ` - ${campaign.name}` : ''}.xlsx`, [
+      { name: 'Orders', rows: buildSampleRows(products) },
+      { name: 'How to fill', rows: sampleInstructions(products) },
+    ])
 
   const chosen = preview?.items.filter((i) => include[i.key]) ?? []
   const mismatches = preview?.responses.filter((r) => r.declared_total !== null && r.declared_total !== r.shirts) ?? []
@@ -165,10 +192,21 @@ export default function Import() {
             <span className="empty" style={{ padding: 0 }}>
               <span className="icon"><FileSpreadsheet size={20} /></span>
             </span>
-            <b style={{ fontWeight: 600 }}>Drop the responses CSV here, or click to choose</b>
-            <span className="hint">Google Sheets → File → Download → Comma-separated values (.csv). The file is read in your browser; only the items you approve are saved.</span>
-            <input ref={fileRef} type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => e.target.files?.[0] && void load(e.target.files[0])} />
+            <b style={{ fontWeight: 600 }}>Drop the order file here, or tap to choose</b>
+            <span className="hint">Excel (.xlsx, .xls), OpenOffice (.ods) or CSV. From Google Sheets: File → Download → Microsoft Excel. The file is read on this device; only the items you approve are saved.</span>
+            <input ref={fileRef} type="file" accept={ACCEPTED_FILES} className="sr-only" onChange={(e) => e.target.files?.[0] && void load(e.target.files[0])} />
           </label>
+          <div className="card card-pad row between">
+            <div>
+              <b style={{ fontWeight: 600 }}>Not sure of the format?</b>
+              <div className="hint">
+                Download a sample file with the right columns and this round's products filled in. It has a “How to fill” tab.
+              </div>
+            </div>
+            <button className="btn" onClick={downloadSample} disabled={products.length === 0}>
+              <Download size={15} /> Download sample file
+            </button>
+          </div>
           <div className="callout">
             <Info size={15} />
             <div>
@@ -181,6 +219,21 @@ export default function Import() {
 
       {preview && (
         <div className="stack">
+          {sheets.length > 1 && (
+            <div className="field" style={{ maxWidth: 360 }}>
+              <label htmlFor="sheet-pick">This file has {sheets.length} tabs. Which one has the orders?</label>
+              <select
+                id="sheet-pick"
+                className="select"
+                value={sheetName}
+                onChange={(e) => usePreview(sheets.find((sh) => sh.name === e.target.value)!, sheets, fileName.replace(/ \(.*\)$/, ''))}
+              >
+                {sheets.map((sh) => (
+                  <option key={sh.name} value={sh.name}>{sh.name} ({Math.max(sh.rows.length - 1, 0)} rows)</option>
+                ))}
+              </select>
+            </div>
+          )}
           {preview.fatal.map((f) => (
             <div key={f} className="callout err"><AlertTriangle size={15} />{f}</div>
           ))}

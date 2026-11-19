@@ -1,5 +1,5 @@
-/** main_admin is shown as "Super admin". (IT was merged into admin.) */
-export type Role = 'main_admin' | 'admin' | 'ops'
+/** A role key from the roles table, e.g. 'main_admin' (Super admin), 'admin', 'ops', or a custom one. */
+export type Role = string
 export type ItemStatus = 'ordered' | 'sent_to_vendor' | 'received' | 'handed_over'
 export type HandoverType = 'self' | 'collected_by_other'
 
@@ -10,12 +10,6 @@ export const STATUS_LABEL: Record<ItemStatus, string> = {
   sent_to_vendor: 'With vendor',
   received: 'In MART',
   handed_over: 'Handed over',
-}
-
-export const ROLE_LABEL: Record<Role, string> = {
-  main_admin: 'Super admin',
-  admin: 'Admin',
-  ops: 'Ops',
 }
 
 export interface Member {
@@ -36,6 +30,8 @@ export interface Campaign {
   id: string
   name: string
   is_active: boolean
+  /** hidden from everyone but super admins, and frozen */
+  locked?: boolean
   created_at?: string
 }
 

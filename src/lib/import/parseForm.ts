@@ -154,7 +154,8 @@ export function parseFormRows(
   const existingSlots = new Set<string>()
   for (const e of existing) {
     existingShirts.set(shirtKey(e), e)
-    existingSlots.add(slotKey(e.roll_no, e.source_timestamp, e.source_slot))
+    // only rows with a form timestamp can be recognised as the same response again
+    if (e.source_timestamp) existingSlots.add(slotKey(e.roll_no, e.source_timestamp, e.source_slot))
   }
   const seenInFile = new Map<string, ParsedItem>()
 
@@ -228,7 +229,7 @@ export function parseFormRows(
         include: true,
       }
 
-      if (roll && existingSlots.has(slotKey(roll, ts, slot))) {
+      if (roll && ts && existingSlots.has(slotKey(roll, ts, slot))) {
         item.issues.push('already_imported')
         item.duplicateOf = 'This response is already in MART Orders'
       } else if (roll && product) {
