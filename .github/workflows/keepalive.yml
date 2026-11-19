@@ -1,0 +1,24 @@
+# Free Supabase projects pause after a week without activity. This calls the tiny public
+# `ping()` function once a week so the project stays awake between T-shirt drops.
+# Uses the same public repo variables as deploy.yml.
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: '17 3 * * 1' # Mondays 03:17 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        env:
+          URL: ${{ vars.VITE_SUPABASE_URL }}
+          KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          test -n "$URL" && test -n "$KEY" || { echo "Set the VITE_SUPABASE_* repo variables"; exit 1; }
+          curl --fail --silent --show-error -X POST "$URL/rest/v1/rpc/ping" \
+            -H "apikey: $KEY" -H "Content-Type: application/json" -d '{}'
