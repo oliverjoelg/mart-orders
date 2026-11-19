@@ -12,7 +12,7 @@ import { useData } from '../lib/store'
 import type { ItemView, Product } from '../lib/types'
 
 /**
- * Ops: "the vendor's box arrived". Pick the colour, tick the shirts that came (or a whole size
+ * Ops: "the vendor's box arrived". Pick the colour, tick the items that came (or a whole size
  * at once), confirm. They become "In MART" and show up as ready at the handover desk.
  */
 export default function Receive() {
@@ -76,7 +76,7 @@ export default function Receive() {
     setBusy(true)
     try {
       const n = await api.setItemsStatus([...ticked], 'received')
-      setDone(`${plural(n, `${product?.colour ?? ''} shirt`)} marked as arrived. Students can now collect them at the desk.`)
+      setDone(`${plural(n, `${product?.colour ?? ''} item`)} marked as arrived. Students can now collect them at the desk.`)
       setTicked(new Set())
       setConfirm(false)
       await refresh()
@@ -107,7 +107,7 @@ export default function Receive() {
                 <span className="swatch" style={{ width: 22, height: 22, borderRadius: 6, background: swatchColour(p.colour) }} />
                 <div style={{ flex: 1 }}>
                   <div className="title">{p.name}</div>
-                  <div className="hint">{n ? `${plural(n, 'shirt')} still with the vendor` : 'Nothing waiting — all arrived'}</div>
+                  <div className="hint">{n ? `${plural(n, 'item')} still with the vendor` : 'Nothing waiting — all arrived'}</div>
                 </div>
                 {n > 0 && <span className="badge badge-amber">{n}</span>}
               </button>
@@ -130,7 +130,7 @@ export default function Receive() {
       </button>
       <PageHead
         title={`Receive ${product.name}`}
-        sub="Tick every shirt that is in the box. Use the size buttons if a whole size came."
+        sub="Tick every item that is in the box. Use the size buttons if a whole size came."
       />
 
       {done && (
@@ -144,7 +144,7 @@ export default function Receive() {
 
       {total === 0 && !q ? (
         <div className="card">
-          <Empty icon={<Check size={20} />} title={`All ${product.colour} shirts have arrived`}>
+          <Empty icon={<Check size={20} />} title={`All ${product.colour} items have arrived`}>
             Nothing left with the vendor for this colour.
           </Empty>
         </div>
@@ -192,13 +192,13 @@ export default function Receive() {
               </div>
             )
           })}
-          {total === 0 && <span className="hint">No shirt matches “{q}”.</span>}
+          {total === 0 && <span className="hint">No item matches “{q}”.</span>}
         </div>
       )}
 
       {ticked.size > 0 && (
         <div className="bulk-bar">
-          <span className="count">{plural(ticked.size, 'shirt')} ticked</span>
+          <span className="count">{plural(ticked.size, 'item')} ticked</span>
           <button className="btn btn-primary" onClick={() => setConfirm(true)}>
             <PackageOpen size={15} /> Mark as arrived
           </button>
@@ -213,13 +213,13 @@ export default function Receive() {
             <>
               <button className="btn" onClick={() => setConfirm(false)}>Cancel</button>
               <button className="btn btn-primary" disabled={busy} onClick={() => void save()}>
-                <Check size={15} /> Yes, {plural(ticked.size, 'shirt')} arrived
+                <Check size={15} /> Yes, {plural(ticked.size, 'item')} arrived
               </button>
             </>
           }
         >
           <p style={{ margin: 0 }}>
-            {plural(ticked.size, `${product.colour} shirt`)} will show as <b>In MART</b>, and those students can collect them at the
+            {plural(ticked.size, `${product.colour} item`)} will show as <b>In MART</b>, and those students can collect them at the
             handover desk.
           </p>
           <span className="hint">Your name is saved with this change.</span>

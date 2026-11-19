@@ -44,7 +44,8 @@ export interface ImportArgs {
     print_name: string | null
     batch: string | null
     source_timestamp: string | null
-    source_slot: number
+    /** 1–4 = position on the form; null for manual orders beyond 4 items */
+    source_slot: number | null
   }[]
 }
 
@@ -80,6 +81,8 @@ export interface Api {
   /** super admin only */
   deleteMember(id: string): Promise<void>
   saveProduct(p: Partial<Product> & { campaign_id: string }): Promise<void>
+  /** admins; the database refuses if any order uses the product */
+  deleteProduct(id: string): Promise<void>
   saveCampaign(c: { id?: string; name: string; is_active: boolean }): Promise<void>
   /** demo only: switch the pretend role */
   setDemoRole?(role: Role): void

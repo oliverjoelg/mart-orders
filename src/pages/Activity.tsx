@@ -10,7 +10,7 @@ import type { AuditEntry } from '../lib/types'
 
 const TABLES: { value: string; label: string }[] = [
   { value: '', label: 'Everything' },
-  { value: 'order_items', label: 'Shirts & status' },
+  { value: 'order_items', label: 'Items & status' },
   { value: 'handovers', label: 'Handovers' },
   { value: 'notes', label: 'Notes & flags' },
   { value: 'imports', label: 'Imports' },

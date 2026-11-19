@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { can, type Action } from '../lib/permissions'
 import { useData } from '../lib/store'
@@ -37,11 +37,11 @@ export const NAV: NavItem[] = [
   { to: '/desk', label: 'Handover desk', short: 'Desk', icon: PackageCheck, group: 'Desk' },
   { to: '/receive', label: 'Receive stock', short: 'Receive', icon: PackageOpen, group: 'Desk', need: 'setStatus' },
   { to: '/', label: 'Overview', icon: LayoutDashboard, group: 'Stock' },
-  { to: '/items', label: 'Shirts', short: 'Shirts', icon: Shirt, group: 'Stock' },
+  { to: '/items', label: 'Items', short: 'Items', icon: Shirt, group: 'Stock' },
   { to: '/inventory', label: 'Inventory', short: 'Stock', icon: Boxes, group: 'Stock' },
   { to: '/print', label: 'Vendor print list', icon: Printer, group: 'Stock' },
   { to: '/exports', label: 'Exports', short: 'Export', icon: Send, group: 'Students' },
-  { to: '/import', label: 'Import CSV', icon: Upload, group: 'Data', need: 'import' },
+  { to: '/import', label: 'Add orders', icon: Upload, group: 'Data', need: 'import' },
   { to: '/activity', label: 'Activity', icon: History, group: 'Data' },
   { to: '/products', label: 'Products', icon: Tag, group: 'Settings' },
   { to: '/team', label: 'Team & roles', icon: Users, group: 'Admin', need: 'manageMembers' },
@@ -82,25 +82,30 @@ function BrandMark({ size = 16 }: { size?: number }) {
   )
 }
 
+/** Which sales round (e.g. "Batch Tees 2026", "Hoodies 2026") every page is showing. */
 function CampaignSelect() {
   const { campaigns, campaign, setCampaignId } = useData()
-  if (campaigns.length <= 1) {
-    return campaign ? <div className="hint" style={{ padding: '0 6px' }}>{campaign.name}</div> : null
-  }
   return (
-    <select
-      className="select"
-      aria-label="Sales round"
-      value={campaign?.id ?? ''}
-      onChange={(e) => setCampaignId(e.target.value)}
-    >
-      {campaigns.map((c) => (
-        <option key={c.id} value={c.id}>
-          {c.name}
-          {c.is_active ? '' : ' (closed)'}
-        </option>
-      ))}
-    </select>
+    <div className="field" style={{ gap: 4 }}>
+      <label htmlFor="round-select" className="label" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: 2 }}>
+        Sales round
+      </label>
+      {campaigns.length === 0 ? (
+        <Link to="/products" className="btn btn-sm">Create a sales round</Link>
+      ) : (
+        <select id="round-select" className="select" value={campaign?.id ?? ''} onChange={(e) => setCampaignId(e.target.value)}>
+          {campaigns.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+              {c.is_active ? '' : ' (closed)'}
+            </option>
+          ))}
+        </select>
+      )}
+      <Link to="/products" className="hint" style={{ paddingLeft: 2 }}>
+        Rounds & products →
+      </Link>
+    </div>
   )
 }
 

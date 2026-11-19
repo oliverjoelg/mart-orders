@@ -16,7 +16,7 @@ type Scope = 'ordered' | 'with_vendor' | 'all'
 const SCOPES: { value: Scope; label: string }[] = [
   { value: 'ordered', label: 'Not yet sent' },
   { value: 'with_vendor', label: 'Sent to vendor' },
-  { value: 'all', label: 'All shirts' },
+  { value: 'all', label: 'All items' },
 ]
 
 export default function PrintList() {
@@ -78,7 +78,7 @@ export default function PrintList() {
         list.filter((i) => i.status === 'ordered').map((i) => i.id),
         'sent_to_vendor',
       )
-      toast.ok(`${plural(n, 'shirt')} marked as sent to the vendor`)
+      toast.ok(`${plural(n, 'item')} marked as sent to the vendor`)
       setConfirm(false)
       await refresh()
     } catch (e) {
@@ -118,7 +118,7 @@ export default function PrintList() {
       />
 
       <div className="toolbar">
-        <Segmented label="Which shirts" value={scope} onChange={setScope} options={SCOPES} />
+        <Segmented label="Which items" value={scope} onChange={setScope} options={SCOPES} />
         <select className="select" value={productId} onChange={(e) => setProductId(e.target.value)} aria-label="Product">
           <option value="">All colours</option>
           {products.map((p) => (
@@ -127,7 +127,7 @@ export default function PrintList() {
         </select>
         {scope === 'ordered' && can(member?.role, 'setStatus') && list.length > 0 && (
           <button className="btn btn-outline-accent" onClick={() => setConfirm(true)}>
-            <Truck size={15} /> Mark {plural(list.length, 'shirt')} as sent
+            <Truck size={15} /> Mark {plural(list.length, 'item')} as sent
           </button>
         )}
       </div>
@@ -135,7 +135,7 @@ export default function PrintList() {
       {list.length === 0 ? (
         <div className="card">
           <Empty icon={<Printer size={20} />} title="Nothing to print">
-            {scope === 'ordered' ? 'Every ordered shirt has already been sent to the vendor.' : 'No shirts match.'}
+            {scope === 'ordered' ? 'Every ordered item has already been sent to the vendor.' : 'No items match.'}
           </Empty>
         </div>
       ) : (
@@ -170,14 +170,14 @@ export default function PrintList() {
             <div key={g.product.id} className="card print-group">
               <div className="card-head">
                 <h3><ProductLabel product={g.product} /></h3>
-                <span className="badge">{plural(g.count, 'shirt')}</span>
+                <span className="badge">{plural(g.count, 'item')}</span>
               </div>
               <div className="card-body stack">
                 {g.sizes.map((s) => (
                   <div key={s.size} className="stack-sm">
                     <div className="row">
                       <span className="shirt-size" style={{ height: 30, minWidth: 34 }}>{s.size.length > 5 ? '…' : s.size}</span>
-                      <span className="muted">{s.size.length > 5 ? s.size : ''} {plural(s.items.length, 'shirt')}</span>
+                      <span className="muted">{s.size.length > 5 ? s.size : ''} {plural(s.items.length, 'item')}</span>
                     </div>
                     <div className="print-names">
                       {s.items.map((i) => (
@@ -203,13 +203,13 @@ export default function PrintList() {
             <>
               <button className="btn" onClick={() => setConfirm(false)}>Cancel</button>
               <button className="btn btn-primary" disabled={busy} onClick={() => void markSent()}>
-                Mark {plural(list.length, 'shirt')} sent
+                Mark {plural(list.length, 'item')} sent
               </button>
             </>
           }
         >
           <p className="muted" style={{ margin: 0 }}>
-            All {plural(list.length, 'shirt')} on this list move from “Ordered” to “With vendor”. Each change is logged with your name.
+            All {plural(list.length, 'item')} on this list move from “Ordered” to “With vendor”. Each change is logged with your name.
           </p>
         </Modal>
       )}

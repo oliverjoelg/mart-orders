@@ -12,7 +12,7 @@ import type { Product } from '../lib/types'
 const splitList = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean)
 
 export default function Products() {
-  const { products, campaigns, campaign, items, refresh, setCampaignId } = useData()
+  const { products, campaigns, campaign, items, snapshot, refresh, setCampaignId } = useData()
   const { api, member } = useAuth()
   const toast = useToast()
   const [editing, setEditing] = useState<Partial<Product> | null>(null)
@@ -59,7 +59,7 @@ export default function Products() {
                 <th className="right">Price</th>
                 <th>Sizes</th>
                 <th>Matches form text</th>
-                <th className="right">Shirts</th>
+                <th className="right">Items</th>
                 <th />
               </tr>
             </thead>
@@ -121,6 +121,14 @@ export default function Products() {
           onSave={async (p) => {
             if (await save(() => api.saveProduct(p), p.id ? 'Product updated' : 'Product added')) setEditing(null)
           }}
+          orderCount={editing.id ? (snapshot?.items ?? []).filter((i) => i.product_id === editing.id).length : 0}
+          onDelete={
+            editing.id
+              ? async () => {
+                  if (await save(() => api.deleteProduct(editing.id!), 'Product deleted')) setEditing(null)
+                }
+              : undefined
+          }
         />
       )}
       {newRound !== null && (
@@ -145,7 +153,7 @@ export default function Products() {
           <div className="field">
             <label htmlFor="round">Name</label>
             <input id="round" className="input" autoFocus placeholder="e.g. Reopening round 2026" value={newRound} onChange={(e) => setNewRound(e.target.value)} />
-            <span className="hint">Then add its products. Each round keeps its own shirts and stock.</span>
+            <span className="hint">Then add its products. Each round keeps its own items and stock.</span>
           </div>
         </Modal>
       )}
@@ -157,10 +165,15 @@ function ProductModal({
   initial,
   onClose,
   onSave,
+  orderCount,
+  onDelete,
 }: {
   initial: Partial<Product>
   onClose(): void
   onSave(p: Partial<Product> & { campaign_id: string }): Promise<void>
+  /** how many orders use this product (any round) */
+  orderCount: number
+  onDelete?(): Promise<void>
 }) {
   const [p, setP] = useState({
     name: initial.name ?? '',
@@ -177,6 +190,19 @@ function ProductModal({
       onClose={onClose}
       footer={
         <>
+          {onDelete && (
+            <button
+              className="btn btn-danger"
+              style={{ marginRight: 'auto' }}
+              disabled={orderCount > 0}
+              title={orderCount > 0 ? `${orderCount} orders use this product, so it can't be deleted. Close its sales round instead.` : undefined}
+              onClick={() => {
+                if (window.confirm(`Delete “${p.name}”? It has no orders, so nothing else changes.`)) void onDelete()
+              }}
+            >
+              Delete
+            </button>
+          )}
           <button className="btn" onClick={onClose}>Cancel</button>
           <button
             className="btn btn-primary"

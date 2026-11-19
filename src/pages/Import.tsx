@@ -9,6 +9,7 @@ import { plural, inr } from '../lib/format'
 import { describeColumnMap } from '../lib/import/headers'
 import { canInclude, ISSUE_LABEL, parseFormCsv, type ImportPreview, type IssueCode, type ParsedItem } from '../lib/import/parseForm'
 import { useData } from '../lib/store'
+import ManualOrder from './ManualOrder'
 
 type View = 'all' | 'issues' | 'excluded'
 
@@ -34,6 +35,7 @@ export default function Import() {
   const [include, setInclude] = useState<Record<string, boolean>>({})
   const [view, setView] = useState<View>('all')
   const [busy, setBusy] = useState(false)
+  const [mode, setMode] = useState<'csv' | 'manual'>('csv')
 
   const existing = useMemo(
     () =>
@@ -91,7 +93,7 @@ export default function Import() {
           source_slot: i.slot,
         })),
       })
-      toast.ok(`Imported ${plural(res.items_created, 'shirt')}`)
+      toast.ok(`Imported ${plural(res.items_created, 'item')}`)
       await refresh()
       navigate('/items')
     } catch (e) {
@@ -104,8 +106,16 @@ export default function Import() {
   return (
     <div className="page">
       <PageHead
-        title="Import Google Form responses"
-        sub={campaign ? `Into ${campaign.name}. Each response becomes one row per shirt.` : 'Create a sales round on the Products page first.'}
+        title="Add orders"
+        sub={
+          campaign ? (
+            <>
+              Into the sales round <b style={{ color: 'var(--text)' }}>{campaign.name}</b>. Switch rounds at the top left.
+            </>
+          ) : (
+            'Create a sales round on the Products page first.'
+          )
+        }
         actions={
           preview && (
             <>
@@ -113,7 +123,7 @@ export default function Import() {
                 Start over
               </button>
               <button className="btn btn-primary" disabled={!chosen.length || busy || !!preview.fatal.length} onClick={() => void save()}>
-                <Upload size={15} /> Import {plural(chosen.length, 'shirt')}
+                <Upload size={15} /> Import {plural(chosen.length, 'item')}
               </button>
             </>
           )
@@ -121,6 +131,22 @@ export default function Import() {
       />
 
       {!preview && (
+        <div style={{ marginBottom: 16 }}>
+          <Segmented
+            label="How"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: 'csv', label: 'From the Google Form (CSV)' },
+              { value: 'manual', label: 'One order by hand' },
+            ]}
+          />
+        </div>
+      )}
+
+      {!preview && mode === 'manual' && <ManualOrder />}
+
+      {!preview && mode === 'csv' && (
         <div className="stack">
           <label
             className={`dropzone${over ? ' over' : ''}`}
@@ -140,14 +166,14 @@ export default function Import() {
               <span className="icon"><FileSpreadsheet size={20} /></span>
             </span>
             <b style={{ fontWeight: 600 }}>Drop the responses CSV here, or click to choose</b>
-            <span className="hint">Google Sheets → File → Download → Comma-separated values (.csv). The file is read in your browser; only the shirts you approve are saved.</span>
+            <span className="hint">Google Sheets → File → Download → Comma-separated values (.csv). The file is read in your browser; only the items you approve are saved.</span>
             <input ref={fileRef} type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => e.target.files?.[0] && void load(e.target.files[0])} />
           </label>
           <div className="callout">
             <Info size={15} />
             <div>
               Re-importing the same sheet later is safe: responses already in MART Orders are skipped, and a roll number ordering
-              the same shirt again is held back as a possible duplicate for you to review.
+              the same item again is held back as a possible duplicate for you to review.
             </div>
           </div>
         </div>
@@ -161,7 +187,7 @@ export default function Import() {
 
           <div className="stats">
             <Stat label="Responses" value={preview.stats.responses} sub={`${plural(preview.stats.blankRows, 'blank row')} skipped`} />
-            <Stat label="Shirts found" value={preview.stats.shirts} sub={`form “Total” says ${preview.stats.declaredTotal}`} />
+            <Stat label="Items found" value={preview.stats.shirts} sub={`form “Total” says ${preview.stats.declaredTotal}`} />
             <Stat label="To import" value={chosen.length} accent sub={`${plural(new Set(chosen.map((i) => i.roll_no)).size, 'student')}`} />
             <Stat label="Possible duplicates" value={preview.stats.duplicates} sub="held back unless you tick them" />
             <Stat label="Already imported" value={preview.stats.alreadyImported} sub="skipped" />
@@ -171,7 +197,7 @@ export default function Import() {
           {mismatches.length > 0 && (
             <div className="card">
               <div className="card-head">
-                <h3>Shirt count differs from the form's “Total” in {plural(mismatches.length, 'response')}</h3>
+                <h3>Item count differs from the form's “Total” in {plural(mismatches.length, 'response')}</h3>
               </div>
               <div className="card-body stack-sm">
                 <span className="hint">Usually a typo in the total. “Amount paid” helps tell which number is right.</span>
@@ -182,9 +208,9 @@ export default function Import() {
                         <th>Row</th>
                         <th>Roll no.</th>
                         <th className="right">Form total</th>
-                        <th className="right">Shirts found</th>
+                        <th className="right">Items found</th>
                         <th className="right">Amount paid</th>
-                        <th className="right">Price of shirts found</th>
+                        <th className="right">Price of items found</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -280,7 +306,7 @@ function PreviewRow({
   return (
     <tr className={on ? '' : 'subtle'}>
       <td className="check-col">
-        <input type="checkbox" checked={on} disabled={!ok} onChange={onToggle} aria-label={`Import row ${item.row} shirt ${item.slot}`} />
+        <input type="checkbox" checked={on} disabled={!ok} onChange={onToggle} aria-label={`Import row ${item.row} item ${item.slot}`} />
       </td>
       <td className="mono nowrap">
         {item.row}

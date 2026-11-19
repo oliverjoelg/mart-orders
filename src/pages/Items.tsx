@@ -88,7 +88,7 @@ export default function Items() {
     setBusy(true)
     try {
       const n = await api.setItemsStatus(ids, status)
-      toast.ok(`${plural(n, 'shirt')} marked ${STATUS_LABEL[status]}${skipped ? ` · ${skipped} already handed over, left as is` : ''}`)
+      toast.ok(`${plural(n, 'item')} marked ${STATUS_LABEL[status]}${skipped ? ` · ${skipped} already handed over, left as is` : ''}`)
       setSelected(new Set())
       await refresh()
     } catch (e) {
@@ -101,13 +101,13 @@ export default function Items() {
   return (
     <div className="page">
       <PageHead
-        title="Shirts"
-        sub={`${plural(filtered.length, 'shirt')}${anyFilter ? ` of ${items.length}` : ''} · one row per shirt`}
+        title="Items"
+        sub={`${plural(filtered.length, 'item')}${anyFilter ? ` of ${items.length}` : ''} · one row per item`}
         actions={
           <button
             className="btn"
             onClick={() =>
-              downloadCsv(`mart-shirts-${fileStamp()}.csv`, [
+              downloadCsv(`mart-items-${fileStamp()}.csv`, [
                 ['Roll number', 'Name', 'Product', 'Size', 'Back print', 'Batch', 'Section', 'Status'],
                 ...filtered.map((i) => [
                   i.buyer.roll_no,
@@ -135,7 +135,7 @@ export default function Items() {
             placeholder="Roll no., name or back print"
             value={f.q}
             onChange={(e) => set('q', e.target.value)}
-            aria-label="Search shirts"
+            aria-label="Search items"
           />
         </div>
         <select className="select" value={f.product} onChange={(e) => set('product', e.target.value)} aria-label="Product">
@@ -177,7 +177,7 @@ export default function Items() {
 
       {filtered.length === 0 ? (
         <div className="card">
-          <Empty icon={<Shirt size={20} />} title={items.length ? 'No shirts match' : 'No shirts yet'}>
+          <Empty icon={<Shirt size={20} />} title={items.length ? 'No items match' : 'No items yet'}>
             {items.length ? 'Try fewer filters.' : 'Import the Google Form responses to get started.'}
           </Empty>
         </div>
@@ -192,7 +192,7 @@ export default function Items() {
                       type="checkbox"
                       checked={allSelected}
                       onChange={() => setSelected(allSelected ? new Set() : new Set(filtered.map((i) => i.id)))}
-                      aria-label="Select all matching shirts"
+                      aria-label="Select all matching items"
                     />
                   </th>
                 )}
@@ -270,7 +270,7 @@ export default function Items() {
 
       {selected.size > 0 && can(role, 'setStatus') && (
         <div className="bulk-bar">
-          <span className="count">{plural(selected.size, 'shirt')} selected · mark as:</span>
+          <span className="count">{plural(selected.size, 'item')} selected · mark as:</span>
           <button className="btn btn-sm" disabled={busy} onClick={() => void bulk('ordered')}>
             Ordered
           </button>

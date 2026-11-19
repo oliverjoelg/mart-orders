@@ -10,7 +10,7 @@ import { ROLE_LABEL, type Member, type Role } from '../lib/types'
 
 const ROLE_HELP: Record<Role, string> = {
   main_admin: 'Everything. Adds and removes anyone, including other super admins',
-  admin: 'Imports, edit shirts and products, undo handovers, delete shirts; adds admins and ops (cannot remove members or touch a super admin)',
+  admin: 'Imports, edit items and products, undo handovers, delete items; adds admins and ops (cannot remove members or touch a super admin)',
   ops: 'Receive stock, hand over, exports, notes. Cannot delete anything',
 }
 

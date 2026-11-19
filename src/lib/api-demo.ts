@@ -241,7 +241,7 @@ export function createDemoApi(): Api {
       let n = 0
       for (const it of db.items) {
         if (!ids.includes(it.id) || it.status === status) continue
-        if (it.status === 'handed_over') throw new Error("Undo the handover (with a reason) before changing this shirt's status")
+        if (it.status === 'handed_over') throw new Error("Undo the handover (with a reason) before changing this item's status")
         setStatus(it, status)
         n++
       }
@@ -255,7 +255,7 @@ export function createDemoApi(): Api {
         throw new Error('Enter the name and roll number of the person collecting')
       }
       const list = db.items.filter((i) => ids.includes(i.id))
-      if (list.some((i) => i.status !== 'received')) throw new Error('Only shirts that are in MART (received) can be handed over')
+      if (list.some((i) => i.status !== 'received')) throw new Error('Only items that are in MART (received) can be handed over')
       for (const it of list) {
         const h: Handover = {
           id: uid('h'), item_id: it.id, type,
@@ -275,7 +275,7 @@ export function createDemoApi(): Api {
       if (!can(role, 'undoHandover')) throw new Error('Only admins can undo a handover')
       if (!reason.trim()) throw new Error('Give a reason for the undo')
       const h = db.handovers.find((x) => x.item_id === itemId && !x.undone_at)
-      if (!h) throw new Error('This shirt has no handover to undo')
+      if (!h) throw new Error('This item has no handover to undo')
       const old = { ...h }
       h.undone_at = new Date().toISOString()
       h.undo_reason = reason.trim()
@@ -408,12 +408,25 @@ export function createDemoApi(): Api {
         Object.assign(existing, p)
         record('UPDATE', 'products', existing.id, null, old, { ...existing })
       } else {
+        const { id: _ignored, ...rest } = p
+        void _ignored
         const row: Product = {
-          id: uid('p'), name: '', colour: '', price_inr: 0, sizes: [], form_keywords: [], sort_order: 99, ...p,
+          name: '', colour: '', price_inr: 0, sizes: [], form_keywords: [], sort_order: 99, ...rest, id: uid('p'),
         }
         db.products.push(row)
         record('INSERT', 'products', row.id, null, null, row)
       }
+    },
+
+    async deleteProduct(id) {
+      await delay()
+      if (!can(role, 'editProducts')) deny()
+      if (db.items.some((i) => i.product_id === id)) {
+        throw new Error('This product has orders, so it can’t be deleted. Close its sales round instead.')
+      }
+      const i = db.products.findIndex((p) => p.id === id)
+      const [old] = db.products.splice(i, 1)
+      record('DELETE', 'products', id, null, old, null)
     },
 
     async saveCampaign(c) {

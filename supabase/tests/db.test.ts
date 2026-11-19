@@ -213,6 +213,27 @@ describe('Ops limits', () => {
   })
 })
 
+describe('deleting products', () => {
+  it('an admin can delete a product nobody ordered', async () => {
+    await as('admin', `insert into public.products (campaign_id, name, colour, price_inr) values ($1, 'Temp Hoodie', 'Grey', 999)`, [
+      campaignId,
+    ])
+    await as('admin', `delete from public.products where name = 'Temp Hoodie'`)
+    expect((await db.query(`select 1 from public.products where name = 'Temp Hoodie'`)).rows).toHaveLength(0)
+  })
+  it('a product with orders cannot be deleted, even by an admin', async () => {
+    const msg = await fails(as('admin', `delete from public.products where id = $1`, [productId]))
+    expect(msg).toMatch(/foreign key/)
+  })
+  it('Ops cannot delete products', async () => {
+    await as('admin', `insert into public.products (campaign_id, name, colour, price_inr) values ($1, 'Temp Cap', 'Black', 299)`, [
+      campaignId,
+    ])
+    await as('ops', `delete from public.products where name = 'Temp Cap'`)
+    expect((await db.query(`select 1 from public.products where name = 'Temp Cap'`)).rows).toHaveLength(1)
+  })
+})
+
 describe('roles', () => {
   it('there is no separate IT role any more (merged into admin)', async () => {
     const r = await db.query<{ v: string }>(`select unnest(enum_range(null::public.app_role))::text as v`)
