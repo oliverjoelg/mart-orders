@@ -12,6 +12,7 @@ import { compareSizes } from '../lib/import/normalize'
 import { can } from '../lib/permissions'
 import { useData } from '../lib/store'
 import { STATUS_LABEL, STATUSES, type ItemStatus } from '../lib/types'
+import { PAGE_HINTS } from '../lib/hints'
 
 const PAGE = 100
 
@@ -102,7 +103,7 @@ export default function Items() {
     <div className="page">
       <PageHead
         title="Items"
-        sub={`${plural(filtered.length, 'item')}${anyFilter ? ` of ${items.length}` : ''} · one row per item`}
+        sub={`${PAGE_HINTS['/items']} ${plural(filtered.length, 'item')}${anyFilter ? ` of ${items.length}` : ''} · one row per item`}
         actions={
           <button
             className="btn"
@@ -193,6 +194,7 @@ export default function Items() {
                       checked={allSelected}
                       onChange={() => setSelected(allSelected ? new Set() : new Set(filtered.map((i) => i.id)))}
                       aria-label="Select all matching items"
+                      title="Tick every item the filters show"
                     />
                   </th>
                 )}
@@ -280,7 +282,7 @@ export default function Items() {
           <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => void bulk('received')}>
             In MART
           </button>
-          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setSelected(new Set())} aria-label="Clear selection">
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setSelected(new Set())} aria-label="Clear selection" title="Untick everything">
             <X size={14} />
           </button>
         </div>

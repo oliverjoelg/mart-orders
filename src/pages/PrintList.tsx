@@ -266,6 +266,7 @@ export default function PrintList() {
                                 }}
                                 onChange={(e) => toggle(ids, e.target.checked)}
                                 aria-label={`Tick all ${g.product.colour} ${s.size}`}
+                                title={`Tick every ${s.size} on this list`}
                               />
                             </td>
                             <td colSpan={5}>
@@ -317,7 +318,7 @@ export default function PrintList() {
             </button>
           )}
           {picked.size > 0 && (
-            <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setPicked(new Set())} aria-label="Untick all">
+            <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setPicked(new Set())} aria-label="Untick all" title="Untick all">
               <X size={14} />
             </button>
           )}

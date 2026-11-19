@@ -9,6 +9,7 @@ import { compareSizes } from '../lib/import/normalize'
 import { buildInventory, type GridCell } from '../lib/inventory'
 import { can } from '../lib/permissions'
 import { useData } from '../lib/store'
+import { PAGE_HINTS } from '../lib/hints'
 
 type Metric = keyof GridCell
 
@@ -57,7 +58,7 @@ export default function Inventory() {
 
   return (
     <div className="page">
-      <PageHead title="Inventory" sub="Product × size. Click a number to see those items." />
+      <PageHead title="Inventory" sub={`${PAGE_HINTS['/inventory']} Click a number to see those items.`} />
 
       <div className="stack">
         <div className="stats">
