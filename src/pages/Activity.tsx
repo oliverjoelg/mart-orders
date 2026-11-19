@@ -13,6 +13,7 @@ const TABLES: { value: string; label: string }[] = [
   { value: 'order_items', label: 'Items & status' },
   { value: 'handovers', label: 'Handovers' },
   { value: 'notes', label: 'Notes & flags' },
+  { value: 'payments', label: 'Payments' },
   { value: 'imports', label: 'Imports' },
   { value: 'members', label: 'Team' },
   { value: 'products', label: 'Products' },

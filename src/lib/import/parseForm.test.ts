@@ -158,3 +158,20 @@ describe('parseFormCsv errors', () => {
     expect(p.stats.blocked).toBe(1)
   })
 })
+
+describe('payment columns', () => {
+  it('finds paid-to, transaction ID, amount and screenshot in both form layouts', () => {
+    const batch = buildColumnMap(BATCH_FORM_HEADERS)
+    expect([batch.paidTo, batch.txn, batch.amount, batch.screenshot]).toEqual([36, 27, 28, 29])
+    // the payment columns must not be mistaken for shirt columns
+    expect(batch.slots).toHaveLength(4)
+  })
+  it('keeps each response’s payment details', () => {
+    const p = parseFormCsv(FAKE_REOPENING_CSV, TEST_PRODUCTS)
+    expect(p.responses.map((r) => [r.paid_to, r.txn_id, r.amount_paid])).toEqual([
+      ['QR', 'T1', 1748],
+      ['QR', 'T2', 1049],
+    ])
+    expect(p.responses[0].source_timestamp).not.toBeNull()
+  })
+})

@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from './lib/auth'
 import { can, type Action } from './lib/permissions'
 import { DataProvider, useData } from './lib/store'
 import Activity from './pages/Activity'
+import Payments from './pages/Payments'
 import Exports from './pages/Exports'
 import Handover from './pages/Handover'
 import Import from './pages/Import'
@@ -66,6 +67,7 @@ function Shell() {
             <Route path="/exports" element={allow('pageLists', <Exports />)} />
             <Route path="/import" element={allow('import', <Import />)} />
             <Route path="/activity" element={allow('pageActivity', <Activity />)} />
+            <Route path="/payments" element={allow('pagePayments', <Payments />)} />
             <Route path="/products" element={allow('pageProducts', <Products />)} />
             <Route path="/receive" element={allow('setStatus', <Receive />)} />
             <Route path="/team" element={allow('manageMembers', <Team />)} />

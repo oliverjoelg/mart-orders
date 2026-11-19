@@ -9,6 +9,8 @@ import type {
   Member,
   Note,
   OrderItem,
+  Payment,
+  PaymentStatus,
   Product,
   Role,
   SpareStock,
@@ -54,7 +56,20 @@ export interface ImportArgs {
     /** 1–4 = position on the form; null for manual orders beyond 4 items */
     source_slot: number | null
   }[]
+  /** each response's payment details; already-saved ones are skipped */
+  payments?: ImportPayment[]
 }
+
+export interface ImportPayment {
+  roll_no: string
+  source_timestamp: string
+  paid_to: string | null
+  amount_paid: number | null
+  txn_id: string | null
+  screenshot_url: string | null
+}
+
+export type PaymentPatch = Partial<Pick<Payment, 'status' | 'note' | 'paid_to' | 'amount_paid' | 'txn_id'>>
 
 export interface ActivityQuery {
   limit: number
@@ -85,7 +100,15 @@ export interface Api {
   undoHandover(itemId: string, reason: string): Promise<void>
   updateItem(id: string, patch: Partial<Pick<OrderItem, 'size' | 'print_name' | 'batch' | 'product_id'>>): Promise<void>
   deleteItem(id: string): Promise<void>
-  importOrders(args: ImportArgs): Promise<{ items_created: number }>
+  importOrders(args: ImportArgs): Promise<{ items_created: number; payments_added: number }>
+  /** One round's payments (empty for roles without the Payments page). */
+  loadPayments(campaignId: string): Promise<Payment[]>
+  updatePayment(id: string, patch: PaymentPatch): Promise<Payment>
+  addPayment(p: { campaign_id: string; buyer_id: string; paid_to: string | null; amount_paid: number | null; txn_id: string | null; note: string | null; status: PaymentStatus }): Promise<Payment>
+  /** super admin only */
+  deletePayment(id: string): Promise<void>
+  /** Payments in OTHER rounds using any of these transaction IDs (an old screenshot reused). */
+  txnElsewhere(txnIds: string[], campaignId: string): Promise<{ txn_id: string; campaign_id: string }[]>
   /** Returns the saved note so the screen can show it without reloading. */
   addNote(note: { buyer_id?: string | null; item_id?: string | null; body: string; is_flag: boolean }): Promise<Note>
   setNoteResolved(id: string, resolved: boolean): Promise<Note>

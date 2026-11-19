@@ -71,6 +71,11 @@ export interface ParsedResponse {
   amount_paid: number | null
   /** sum of product prices of the parsed shirts */
   expected_amount: number
+  source_timestamp: string | null
+  /** whose QR code they paid to */
+  paid_to: string | null
+  txn_id: string | null
+  screenshot_url: string | null
   comment: string | null
 }
 
@@ -267,6 +272,10 @@ export function parseFormRows(
       shirts,
       amount_paid: amountDigits ? Math.round(Number(amountDigits)) : null,
       expected_amount: expected,
+      source_timestamp: ts,
+      paid_to: cleanText(cell(row, columns.paidTo)),
+      txn_id: cleanText(cell(row, columns.txn)),
+      screenshot_url: /^https?:\/\//i.test(cell(row, columns.screenshot).trim()) ? cell(row, columns.screenshot).trim() : null,
       comment: cleanText(cell(row, columns.comments)),
     })
   })

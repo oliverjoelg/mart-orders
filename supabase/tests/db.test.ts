@@ -482,6 +482,68 @@ describe('roles & permissions (configurable)', () => {
   })
 })
 
+describe('payments', () => {
+  const TS = '2026-09-04T14:52:09.559Z'
+  const importPayments = (payments: unknown[]) =>
+    as<{ import_orders: { payments_added: number } }>(
+      'admin',
+      `select public.import_orders($1, 'pay.csv', 1, 0, '[]'::jsonb, '[]'::jsonb, $2::jsonb)`,
+      [campaignId, JSON.stringify(payments)],
+    )
+  const count = async (who: Who) =>
+    (await as<{ n: number }>(who, `select count(*)::int as n from public.payments where campaign_id = $1`, [campaignId])).rows[0].n
+
+  it('adding orders saves payment details, once per form response', async () => {
+    const first = await importPayments([
+      { roll_no: 'PGP26-001', source_timestamp: TS, paid_to: 'Animesh', amount_paid: 1398, txn_id: '512345678901', screenshot_url: 'https://drive.google.com/x' },
+      { roll_no: 'PGP26-999', source_timestamp: TS, paid_to: 'Ekta', amount_paid: 699, txn_id: 'T9' },
+    ])
+    expect(first.rows[0].import_orders.payments_added).toBe(1) // PGP26-999 has no items in this round
+    const again = await importPayments([{ roll_no: 'PGP26-001', source_timestamp: TS, paid_to: 'Animesh', amount_paid: 1398 }])
+    expect(again.rows[0].import_orders.payments_added).toBe(0)
+    // the same response from an Excel copy, where the time lost its milliseconds
+    const excel = await importPayments([{ roll_no: 'PGP26-001', source_timestamp: '2026-09-04T14:52:09Z', paid_to: 'Animesh', amount_paid: 1398 }])
+    expect(excel.rows[0].import_orders.payments_added).toBe(0)
+  })
+  it('only roles with the Payments page can see them', async () => {
+    expect(await count('admin')).toBe(0)
+    expect(await count('ops')).toBe(0)
+    expect(await count('main')).toBe(1)
+  })
+  it('ticking needs "Check payments" and records who and when', async () => {
+    await as('admin', `update public.payments set status = 'received' where campaign_id = $1`, [campaignId])
+    let r = await db.query<{ status: string }>(`select status from public.payments where campaign_id = $1`, [campaignId])
+    expect(r.rows[0].status).toBe('unchecked')
+
+    await as('main', `insert into public.role_permissions (role_key, permission) values ('admin', 'page_payments'), ('admin', 'check_payments')`)
+    expect(await count('admin')).toBe(1)
+    await as('admin', `update public.payments set status = 'received' where campaign_id = $1`, [campaignId])
+    const done = await db.query<{ status: string; checked_by: string; checked_at: string | null }>(
+      `select status, checked_by, checked_at from public.payments where campaign_id = $1`, [campaignId])
+    expect(done.rows[0]).toMatchObject({ status: 'received', checked_by: USERS.admin.sub })
+    expect(done.rows[0].checked_at).not.toBeNull()
+
+    await as('admin', `update public.payments set status = 'unchecked' where campaign_id = $1`, [campaignId])
+    r = await db.query<{ status: string; checked_by: string | null }>(`select status, checked_by from public.payments where campaign_id = $1`, [campaignId])
+    expect(r.rows[0]).toMatchObject({ status: 'unchecked', checked_by: null })
+  })
+  it('payment log entries are hidden from roles without the Payments page', async () => {
+    const q = `select count(*)::int as n from public.audit_log where table_name = 'payments'`
+    expect((await as<{ n: number }>('ops', q)).rows[0].n).toBe(0)
+    expect((await as<{ n: number }>('main', q)).rows[0].n).toBeGreaterThan(0)
+  })
+  it('only a super admin can remove a payment', async () => {
+    await as('admin', `delete from public.payments where campaign_id = $1`, [campaignId])
+    expect(await count('main')).toBe(1)
+    await as('main', `insert into public.payments (campaign_id, buyer_id, paid_to, amount_paid)
+                      select $1, id, 'Ekta', 10 from public.buyers where roll_no = 'PGP26-002'`, [campaignId])
+    expect(await count('main')).toBe(2)
+    await as('main', `delete from public.payments where campaign_id = $1 and amount_paid = 10`, [campaignId])
+    expect(await count('main')).toBe(1)
+    await as('main', `delete from public.role_permissions where role_key = 'admin' and permission in ('page_payments', 'check_payments')`)
+  })
+})
+
 describe('locked sales rounds', () => {
   let lockedCampaign: string
   beforeAll(async () => {

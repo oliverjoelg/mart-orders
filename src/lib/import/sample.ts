@@ -36,7 +36,10 @@ export const SAMPLE_HEADERS = [
   'Batch 4',
   `${PRINT} 4`,
   'Total No. of items ordered',
+  'Payment (Scan any one of the QR codes below to pay)',
+  'Transaction ID',
   'Amount paid',
+  'Payment Screenshot',
 ]
 
 function stamp(d: Date): string {
@@ -70,6 +73,8 @@ export function buildSampleRows(products: Product[], now = new Date()): string[]
   set(row1, 'Add another item', 'No')
   set(row1, 'Total No. of items ordered', '1')
   set(row1, 'Amount paid', String(a?.price_inr ?? ''))
+  set(row1, 'Payment (Scan any one of the QR codes below to pay)', 'Name on the QR code')
+  set(row1, 'Transaction ID', '512345678901')
 
   set(row2, 'Timestamp', stamp(new Date(now.getTime() + 60_000)))
   set(row2, 'Email Address', 'pgdm26example_b@mdi.ac.in')
@@ -90,6 +95,8 @@ export function buildSampleRows(products: Product[], now = new Date()): string[]
   set(row2, 'Add another item 2', 'No')
   set(row2, 'Total No. of items ordered', '2')
   set(row2, 'Amount paid', String((a?.price_inr ?? 0) + (b?.price_inr ?? 0)))
+  set(row2, 'Payment (Scan any one of the QR codes below to pay)', 'Name on the QR code')
+  set(row2, 'Transaction ID', '512345678902')
 
   return [SAMPLE_HEADERS, row1, row2]
 }
@@ -105,7 +112,8 @@ export function sampleInstructions(products: Product[]): string[][] {
     ["Size: one of the product's sizes (e.g. S, M, L, XL). Anything else is kept as a custom size and flagged."],
     ['Name on back: leave empty or write NA for no name.'],
     ["Batch for items 2–4: leave empty to use the student's batch."],
-    ['Timestamp: when they ordered (yyyy-mm-dd hh:mm). Can be left empty.'],
+    ['Timestamp: when they ordered (yyyy-mm-dd hh:mm). Needed to save the payment details below.'],
+    ['Payment columns (optional): whose QR code they paid to, the transaction ID, amount paid and a screenshot link.'],
     ['Delete the two example rows before uploading.'],
     [''],
     ['Products in this sales round (copy the name into "Item Details Color"):'],

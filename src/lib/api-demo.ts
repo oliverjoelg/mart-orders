@@ -25,6 +25,7 @@ const DEMO_PERMISSIONS: PermissionRow[] = [
   ['resolve_flags', 'Mark flags as sorted', null],
   ['manage_team', 'Add team members & set roles', 'Cannot touch super admins'],
   ['remove_members', 'Remove team members', 'Cannot remove super admins'],
+  ['check_payments', 'Check payments', 'Mark payments received or as a problem, fix typos, add a payment'],
 ].map(([key, label, hint], i): PermissionRow => ({ key: key!, label: label!, hint, kind: 'action', sort_order: (i + 1) * 10 }))
   .concat(
     [
@@ -36,12 +37,15 @@ const DEMO_PERMISSIONS: PermissionRow[] = [
       ['page_print_list', 'Vendor print list', null],
       ['page_activity', 'Activity', null],
       ['page_products', 'Products', null],
+      ['page_payments', 'Payments', 'See who paid what, and to whom'],
     ].map(([key, label, hint], i): PermissionRow => ({ key: key!, label: label!, hint, kind: 'page', sort_order: 200 + i * 10 })),
   )
+// like the database: the payment permissions start with the super admin only
+const NEW_PERMS = ['remove_members', 'check_payments', 'page_payments']
 const DEMO_ROLE_PERMS: RolePermissionRow[] = [
-  ...DEMO_PERMISSIONS.filter((p) => p.key !== 'remove_members').map((p) => ({ role_key: 'admin', permission: p.key })),
+  ...DEMO_PERMISSIONS.filter((p) => !NEW_PERMS.includes(p.key)).map((p) => ({ role_key: 'admin', permission: p.key })),
   ...DEMO_PERMISSIONS.filter(
-    (p) => p.kind === 'page' || ['receive_stock', 'hand_over', 'spare_stock', 'add_notes', 'resolve_flags'].includes(p.key),
+    (p) => (p.kind === 'page' && p.key !== 'page_payments') || ['receive_stock', 'hand_over', 'spare_stock', 'add_notes', 'resolve_flags'].includes(p.key),
   ).map((p) => ({ role_key: 'ops', permission: p.key })),
 ]
 import type {
@@ -53,6 +57,7 @@ import type {
   Member,
   Note,
   OrderItem,
+  Payment,
   Product,
   Role,
   SpareStock,
@@ -84,7 +89,7 @@ const DEMO_MEMBERS: Member[] = [
 ]
 const USER_ID: Record<string, string> = { m1: 'u1', m2: 'u2', m3: 'u3', m4: 'u4', m5: 'u5' }
 
-function build(): { db: Snapshot; log: AuditEntry[] } {
+function build(): { db: Snapshot & { payments: Payment[] }; log: AuditEntry[] } {
   const r = rng(26)
   const pick = <T,>(a: T[]) => a[Math.floor(r() * a.length)]
   const campaign: Campaign = { id: 'c-2026', name: 'Batch Tees 2026', is_active: true }
@@ -102,6 +107,7 @@ function build(): { db: Snapshot; log: AuditEntry[] } {
   const buyers: Buyer[] = []
   const items: OrderItem[] = []
   const handovers: Handover[] = []
+  const payments: Payment[] = []
   const log: AuditEntry[] = []
   const t0 = Date.parse('2026-09-04T14:00:00Z')
 
@@ -122,6 +128,7 @@ function build(): { db: Snapshot; log: AuditEntry[] } {
     buyers.push(b)
     const shirts = r() < 0.55 ? 1 : r() < 0.8 ? 2 : r() < 0.93 ? 3 : 4
     const ts = new Date(t0 + n * 37 * 60_000).toISOString()
+    const firstItem = items.length
     for (let s = 1; s <= shirts; s++) {
       const product = r() < 0.38 ? products[0] : r() < 0.55 ? products[2] : r() < 0.7 ? products[1] : products[3]
       const roll = r()
@@ -161,6 +168,22 @@ function build(): { db: Snapshot; log: AuditEntry[] } {
         })
       }
     }
+    // what they say they paid: mostly right, a few typos, some already checked
+    const cost = items.slice(firstItem).reduce((sum, it) => sum + (products.find((p) => p.id === it.product_id)?.price_inr ?? 0), 0)
+    const odd = r()
+    const checked = r()
+    payments.push({
+      id: uid('pay'), campaign_id: campaign.id, buyer_id: b.id, source_timestamp: ts,
+      paid_to: r() < 0.78 ? 'Animesh Pratap Kumawat' : 'Ekta Bansal',
+      amount_paid: odd < 0.04 ? cost + 1 : odd < 0.07 ? cost - 699 : odd < 0.08 ? null : cost,
+      txn_id: n === 42 ? payments[3]?.txn_id ?? null : String(500000000000 + Math.floor(r() * 99999999999)),
+      screenshot_url: 'https://drive.google.com/open?id=demo',
+      status: checked < 0.45 ? 'received' : checked < 0.48 ? 'problem' : 'unchecked',
+      note: checked >= 0.45 && checked < 0.48 ? 'Not in UPI history' : null,
+      checked_by: checked < 0.48 ? 'u1' : null,
+      checked_at: checked < 0.48 ? new Date(t0 + 5 * 86400_000).toISOString() : null,
+      created_at: ts,
+    })
   }
 
   const notes: Note[] = [
@@ -187,7 +210,7 @@ function build(): { db: Snapshot; log: AuditEntry[] } {
   }
   return {
     db: {
-      campaigns: [campaign], products, buyers, items, handovers, notes, spare, members: DEMO_MEMBERS,
+      campaigns: [campaign], products, buyers, items, handovers, notes, payments, spare, members: DEMO_MEMBERS,
       roles: structuredClone(DEMO_ROLES), permissions: DEMO_PERMISSIONS, rolePermissions: structuredClone(DEMO_ROLE_PERMS),
       campaignId: null as string | null,
     },
@@ -315,7 +338,7 @@ export function createDemoApi(): Api {
       await delay(300)
       return clone({
         campaigns: db.campaigns, products: db.products, buyers: db.buyers, order_items: db.items, handovers: db.handovers,
-        notes: db.notes, spare_stock: db.spare, members: db.members, roles: db.roles, role_permissions: db.rolePermissions,
+        notes: db.notes, payments: db.payments, spare_stock: db.spare, members: db.members, roles: db.roles, role_permissions: db.rolePermissions,
         audit_log: log,
       }) as unknown as Record<string, Record<string, unknown>[]>
     },
@@ -406,7 +429,67 @@ export function createDemoApi(): Api {
         db.items.push(it)
         record('INSERT', 'order_items', it.id, it.id, null, { ...it })
       }
-      return { items_created: a.items.length }
+      let added = 0
+      for (const x of a.payments ?? []) {
+        const b = db.buyers.find((y) => y.roll_no === x.roll_no)
+        if (!b || !db.items.some((i) => i.buyer_id === b.id && i.campaign_id === a.campaignId)) continue
+        if (db.payments.some((p) => p.campaign_id === a.campaignId && p.buyer_id === b.id && p.source_timestamp === x.source_timestamp)) continue
+        const pay: Payment = {
+          id: uid('pay'), campaign_id: a.campaignId, buyer_id: b.id, source_timestamp: x.source_timestamp, paid_to: x.paid_to,
+          amount_paid: x.amount_paid, txn_id: x.txn_id, screenshot_url: x.screenshot_url, status: 'unchecked', note: null,
+          checked_by: null, checked_at: null, created_at: new Date().toISOString(),
+        }
+        db.payments.push(pay)
+        record('INSERT', 'payments', pay.id, null, null, { ...pay })
+        added++
+      }
+      return { items_created: a.items.length, payments_added: added }
+    },
+
+    async loadPayments(campaignId) {
+      await delay(80)
+      if (!can(role, 'pagePayments')) return []
+      return clone(db.payments.filter((p) => p.campaign_id === campaignId))
+    },
+
+    async updatePayment(id, patch) {
+      await delay()
+      if (!can(role, 'checkPayments')) deny()
+      const p = db.payments.find((x) => x.id === id)!
+      const old = { ...p }
+      Object.assign(p, patch)
+      if (patch.status && patch.status !== old.status) {
+        p.checked_by = patch.status === 'unchecked' ? null : meId()
+        p.checked_at = patch.status === 'unchecked' ? null : new Date().toISOString()
+      }
+      record('UPDATE', 'payments', id, null, old, { ...p })
+      return clone(p)
+    },
+
+    async addPayment(x) {
+      await delay()
+      if (!can(role, 'checkPayments')) deny()
+      const p: Payment = {
+        id: uid('pay'), source_timestamp: null, screenshot_url: null, created_at: new Date().toISOString(), ...x,
+        checked_by: x.status === 'unchecked' ? null : meId(), checked_at: x.status === 'unchecked' ? null : new Date().toISOString(),
+      }
+      db.payments.push(p)
+      record('INSERT', 'payments', p.id, null, null, { ...p })
+      return clone(p)
+    },
+
+    async deletePayment(id) {
+      await delay()
+      if (!isSuperRole(role)) deny()
+      const i = db.payments.findIndex((p) => p.id === id)
+      record('DELETE', 'payments', id, null, { ...db.payments[i] }, null)
+      db.payments.splice(i, 1)
+    },
+
+    async txnElsewhere(txnIds, campaignId) {
+      await delay(60)
+      const set = new Set(txnIds)
+      return db.payments.filter((p) => p.campaign_id !== campaignId && p.txn_id && set.has(p.txn_id)).map((p) => ({ txn_id: p.txn_id!, campaign_id: p.campaign_id }))
     },
 
     async addNote(n) {

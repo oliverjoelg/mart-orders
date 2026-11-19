@@ -56,6 +56,19 @@ export function describeEntry(e: AuditEntry, ctx: DescribeCtx): { text: string; 
       if (changed.includes('resolved')) return { text: `${n.resolved ? 'resolved' : 'reopened'} a flag on ${target}: “${str(n.body)}”`, tone: n.resolved ? 'green' : 'amber' }
       return { text: `edited a note on ${target}`, tone: '' }
     }
+    case 'payments': {
+      const roll = ctx.buyersById.get(String(n.buyer_id ?? o.buyer_id))?.roll_no ?? 'a student'
+      const amt = n.amount_paid ?? o.amount_paid
+      const what = `${roll}'s payment${amt != null ? ` of ₹${amt}` : ''}${(n.paid_to ?? o.paid_to) ? ` to ${str(n.paid_to ?? o.paid_to)}` : ''}`
+      if (e.action === 'INSERT') return { text: `saved ${what}`, tone: '' }
+      if (e.action === 'DELETE') return { text: `removed ${what}`, tone: 'red' }
+      if (changed.includes('status')) {
+        if (n.status === 'received') return { text: `marked ${what} as received`, tone: 'green' }
+        if (n.status === 'problem') return { text: `flagged ${what} as a problem: “${str(n.note)}”`, tone: 'red' }
+        return { text: `set ${what} back to “to check”`, tone: 'amber' }
+      }
+      return { text: `edited ${what} (${changed.join(', ')})`, tone: '' }
+    }
     case 'buyers': {
       const roll = str(n.roll_no ?? o.roll_no)
       if (e.action === 'INSERT') return { text: `added student ${roll}`, tone: '' }

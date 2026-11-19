@@ -1,9 +1,9 @@
 import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Info, Upload } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../components/Toast'
 import { PageHead, Segmented, Stat } from '../components/ui'
-import { friendlyError } from '../lib/api'
+import { friendlyError, type ImportPayment } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { plural, inr } from '../lib/format'
 import { describeColumnMap } from '../lib/import/headers'
@@ -12,9 +12,13 @@ import { buildColumnMap } from '../lib/import/headers'
 import { ACCEPTED_FILES, downloadXlsx, isSpreadsheetName, readSpreadsheet, type Sheet } from '../lib/import/readFile'
 import { buildSampleRows, sampleInstructions } from '../lib/import/sample'
 import { useData } from '../lib/store'
+import { can } from '../lib/permissions'
 import ManualOrder from './ManualOrder'
 
 type View = 'all' | 'issues' | 'excluded'
+
+/** form times can differ by milliseconds between a CSV and an Excel copy of the same sheet */
+const toSecond = (ts: string) => Math.floor(new Date(ts).getTime() / 1000)
 
 const ISSUE_CLASS: Record<IssueCode, string> = {
   unknown_product: 'badge badge-red',
@@ -28,7 +32,7 @@ const ISSUE_CLASS: Record<IssueCode, string> = {
 
 export default function Import() {
   const { products, productsById, campaign, snapshot, buyersById, refresh } = useData()
-  const { api } = useAuth()
+  const { api, member } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -92,7 +96,50 @@ export default function Import() {
       { name: 'How to fill', rows: sampleInstructions(products) },
     ])
 
+  // payment details already saved for this round (only known to roles that can see payments)
+  const [savedPayments, setSavedPayments] = useState<Set<string> | null>(null)
+  useEffect(() => {
+    let live = true
+    setSavedPayments(null)
+    if (campaign && can(member?.role, 'pagePayments')) {
+      api
+        .loadPayments(campaign.id)
+        .then((ps) => {
+          if (!live) return
+          setSavedPayments(
+            new Set(ps.filter((p) => p.source_timestamp).map((p) => `${buyersById.get(p.buyer_id)?.roll_no}|${toSecond(p.source_timestamp!)}`)),
+          )
+        })
+        .catch(() => undefined)
+    }
+    return () => {
+      live = false
+    }
+  }, [api, campaign, member?.role, buyersById, preview])
+
   const chosen = preview?.items.filter((i) => include[i.key]) ?? []
+  // each response's payment details go with it: for the items being imported now, and for
+  // responses already imported earlier (that is how an old file fills in its payments)
+  const payments: ImportPayment[] = useMemo(() => {
+    if (!preview) return []
+    const rowsWithItems = new Set(
+      preview.items
+        .filter((i) => include[i.key] || i.issues.includes('already_imported') || (i.issues.includes('duplicate') && i.duplicateOf === 'Same shirt already in MART Orders'))
+        .map((i) => i.row),
+    )
+    return preview.responses
+      .filter((r) => r.roll_no && r.source_timestamp && rowsWithItems.has(r.row))
+      .filter((r) => r.paid_to || r.txn_id || r.amount_paid !== null || r.screenshot_url)
+      .filter((r) => !savedPayments?.has(`${r.roll_no}|${toSecond(r.source_timestamp!)}`))
+      .map((r) => ({
+        roll_no: r.roll_no,
+        source_timestamp: r.source_timestamp!,
+        paid_to: r.paid_to,
+        amount_paid: r.amount_paid,
+        txn_id: r.txn_id,
+        screenshot_url: r.screenshot_url,
+      }))
+  }, [preview, include, savedPayments])
   const mismatches = preview?.responses.filter((r) => r.declared_total !== null && r.declared_total !== r.shirts) ?? []
 
   const shown = (preview?.items ?? []).filter((i) =>
@@ -119,10 +166,16 @@ export default function Import() {
           source_timestamp: i.source_timestamp,
           source_slot: i.slot,
         })),
+        payments,
       })
-      toast.ok(`Imported ${plural(res.items_created, 'item')}`)
+      toast.ok(
+        [
+          res.items_created ? `Imported ${plural(res.items_created, 'item')}` : '',
+          res.payments_added ? `saved ${plural(res.payments_added, 'payment')}` : '',
+        ].filter(Boolean).join(' · ') || 'Nothing new to save',
+      )
       await refresh()
-      navigate('/items')
+      navigate(res.items_created || !can(member?.role, 'pagePayments') ? '/items' : '/payments')
     } catch (e) {
       toast.err(friendlyError(e))
     } finally {
@@ -149,8 +202,13 @@ export default function Import() {
               <button className="btn" onClick={() => { setPreview(null); setFileName('') }}>
                 Start over
               </button>
-              <button className="btn btn-primary" disabled={!chosen.length || busy || !!preview.fatal.length} onClick={() => void save()}>
-                <Upload size={15} /> Import {plural(chosen.length, 'item')}
+              <button
+                className="btn btn-primary"
+                disabled={(!chosen.length && !payments.length) || busy || !!preview.fatal.length}
+                onClick={() => void save()}
+              >
+                <Upload size={15} />{' '}
+                {chosen.length ? `Import ${plural(chosen.length, 'item')}` : `Save ${plural(payments.length, 'payment')}`}
               </button>
             </>
           )
@@ -245,6 +303,11 @@ export default function Import() {
             <Stat label="Possible duplicates" value={preview.stats.duplicates} sub="held back unless you tick them" />
             <Stat label="Already imported" value={preview.stats.alreadyImported} sub="skipped" />
             <Stat label="Can't import" value={preview.stats.blocked} sub="unknown colour / no roll no." />
+            <Stat
+              label="Payment details"
+              value={payments.length}
+              sub={savedPayments ? 'new; already saved ones are skipped' : 'saved with the orders'}
+            />
           </div>
 
           {mismatches.length > 0 && (

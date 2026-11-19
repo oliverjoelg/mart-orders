@@ -18,6 +18,8 @@ From `MART Tshirt Working File.xlsx` and `Batch Tshirts form (Responses).xlsx` (
 **In:** inventory, stock received from the vendor, handovers, roll-number/email exports,
 vendor print lists, change history, team roles.
 **Out:** ordering and payments. Those stay in the Google Form / elsewhere. Orders enter this tool
+
+**Added 2026-11-20:** a Payments page to *check* payments (who paid how much, to whom; ticked by hand as received). Taking payments stays out of scope.
 only by **CSV import of the form responses**.
 
 ## Stack (decided: best long-term option)

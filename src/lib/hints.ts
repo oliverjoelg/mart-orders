@@ -11,6 +11,7 @@ export const PAGE_HINTS = {
   '/print': 'What to send the vendor: sizes and names for the back.',
   '/exports': 'Email lists of students, e.g. everyone whose item is ready.',
   '/import': 'Bring in orders from the Google Form file, or add one by hand.',
+  '/payments': 'Who paid how much, to whom, and whether it has been checked.',
   '/activity': 'Every change: who did it, when, and what it was before.',
   '/products': 'Sales rounds and the items sold in each.',
   '/team': 'Who can sign in, and what each role can do.',
