@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+!.env.example
+/dist/
+/build/
+.claude/settings.local.json
+
+# student data never goes in git
+*.xlsx
+*.xls
+*.csv
+data/
