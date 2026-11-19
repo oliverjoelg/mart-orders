@@ -139,9 +139,11 @@ describe('sign-in gate', () => {
     const r = await db.query<{ user_id: string }>(`select user_id from public.members where email = 'admin@mdi.ac.in'`)
     expect(r.rows[0].user_id).toBe(USERS.admin.sub)
   })
-  it('only accepts @mdi.ac.in emails on the team list', async () => {
+  it('only accepts @mdi.ac.in emails on the team list (except backup super admins)', async () => {
     const msg = await fails(as('main', `insert into public.members (email, display_name) values ('x@gmail.com', 'X')`))
-    expect(msg).toMatch(/check constraint/)
+    expect(msg).toMatch(/need an @mdi.ac.in email/)
+    const bad = await fails(as('main', `insert into public.members (email, display_name, role) values ('not an email', 'X', 'main_admin')`))
+    expect(bad).toMatch(/check constraint/)
   })
 })
 
@@ -397,6 +399,47 @@ describe('main admin safety', () => {
   })
 })
 
+
+
+describe('backup super admins (non-MDI)', () => {
+  const BACKUP = 'mart.backup@gmail.com'
+  it('a super admin can add a personal email, but only as super admin', async () => {
+    await as('main', `insert into public.members (email, display_name, role) values ($1, 'Backup', 'main_admin')`, [BACKUP])
+    const asOps = await fails(as('main', `insert into public.members (email, display_name, role) values ('y@gmail.com', 'Y', 'ops')`))
+    expect(asOps).toMatch(/need an @mdi.ac.in email/)
+    const demote = await fails(as('main', `update public.members set role = 'admin' where email = $1`, [BACKUP]))
+    expect(demote).toMatch(/can only be a super admin/)
+  })
+  it('an admin cannot add one', async () => {
+    const msg = await fails(as('admin', `insert into public.members (email, display_name, role) values ('z@gmail.com', 'Z', 'main_admin')`))
+    expect(msg).toMatch(/row-level security/)
+  })
+  it('is invisible to admins and ops, visible to super admins', async () => {
+    for (const who of ['admin', 'ops'] as const) {
+      const r = await as(who, `select 1 from public.members where email = $1`, [BACKUP])
+      expect(r.rows).toHaveLength(0)
+      const log = await as(who, `select 1 from public.audit_log where table_name = 'members' and new_data ->> 'email' = $1`, [BACKUP])
+      expect(log.rows).toHaveLength(0)
+    }
+    expect((await as('main', `select 1 from public.members where email = $1`, [BACKUP])).rows).toHaveLength(1)
+    expect((await as('main', `select 1 from public.audit_log where new_data ->> 'email' = $1`, [BACKUP])).rows.length).toBeGreaterThan(0)
+  })
+  it('can sign in and acts as a super admin', async () => {
+    await db.query(`insert into auth.users (email) values ($1)`, [BACKUP])
+    const r = await db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claims', $1, true)`, [
+        JSON.stringify({ sub: '00000000-0000-0000-0000-0000000000bb', email: BACKUP, role: 'authenticated' }),
+      ])
+      await tx.exec('set local role authenticated')
+      return tx.query<{ ok: boolean }>(`select public.is_super() as ok`)
+    })
+    expect(r.rows[0].ok).toBe(true)
+  })
+  it('a super admin can remove it', async () => {
+    await as('main', `delete from public.members where email = $1`, [BACKUP])
+    expect((await db.query(`select 1 from public.members where email = $1`, [BACKUP])).rows).toHaveLength(0)
+  })
+})
 
 describe('roles & permissions (configurable)', () => {
   it('a new role gets exactly the ticked permissions', async () => {

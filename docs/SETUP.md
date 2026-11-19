@@ -16,7 +16,9 @@ or paste each file in `supabase/migrations/` into **SQL Editor** in filename ord
 
 The last migration makes `pgdm26oliver_j@mdi.ac.in` the first super admin. Everyone else is
 added from the **Team & roles** tab in the app (super admin and admins only). Only `@mdi.ac.in`
-emails can be added.
+emails can be added, except **backup super admins**: a super admin can add a personal Google
+email with the Super admin role. Those rows are hidden from everyone but super admins. To sign in,
+the backup person taps "Use another account" on the Google screen.
 
 > The sign-up check is a trigger on `auth.users` (`enforce_member_signup`). If Supabase ever
 > refuses triggers on the auth schema, use **Authentication → Hooks → Before User Created**
