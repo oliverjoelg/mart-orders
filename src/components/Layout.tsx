@@ -21,7 +21,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { can, type Action } from '../lib/permissions'
 import { useData } from '../lib/store'
-import { ROLE_LABEL, type Role } from '../lib/types'
+import { memberLabel, ROLE_LABEL, type Role } from '../lib/types'
 import { Avatar, Modal, RoleBadge } from './ui'
 
 interface NavItem {
@@ -178,9 +178,9 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="sidebar-foot">
           {member && (
             <div className="user-chip">
-              <Avatar name={member.display_name} />
+              <Avatar name={memberLabel(member)} />
               <div className="who">
-                <div style={{ fontWeight: 500 }}>{member.display_name}</div>
+                <div style={{ fontWeight: 500 }}>{memberLabel(member)}</div>
                 <div className="hint">{member.email}</div>
               </div>
             </div>
@@ -241,9 +241,9 @@ export function Layout({ children }: { children: ReactNode }) {
             </nav>
             {member && (
               <div className="user-chip" style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>
-                <Avatar name={member.display_name} />
+                <Avatar name={memberLabel(member)} />
                 <div className="who">
-                  <div style={{ fontWeight: 500 }}>{member.display_name}</div>
+                  <div style={{ fontWeight: 500 }}>{memberLabel(member)}</div>
                   <div className="hint">{member.email}</div>
                 </div>
               </div>

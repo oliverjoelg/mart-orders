@@ -147,12 +147,13 @@ export function createSupabaseApi(): Api {
 
     async saveMember(m) {
       // Names come from Google at sign-in (see link_my_member); edits only change role / active.
-      if (m.id) check(await sb.from('members').update({ role: m.role, active: m.active }).eq('id', m.id))
+      if (m.id) check(await sb.from('members').update({ role: m.role, active: m.active, nickname: m.nickname }).eq('id', m.id))
       else
         check(
           await sb.from('members').insert({
             email: m.email.trim().toLowerCase(),
             display_name: m.display_name.trim(),
+            nickname: m.nickname,
             role: m.role,
             active: m.active,
           }),

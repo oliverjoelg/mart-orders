@@ -238,6 +238,17 @@ describe('names come from Google', () => {
     // put the short name back for the audit-log tests below
     await db.query(`update public.members set display_name = 'ops' where email = 'ops@mdi.ac.in'`)
   })
+  it('the activity log uses the nickname when one is set', async () => {
+    await as('main', `update public.members set nickname = 'Opsy' where email = 'ops@mdi.ac.in'`)
+    await as('ops', `insert into public.notes (buyer_id, body, created_by) select id, 'nickname check', $1 from public.buyers limit 1`, [
+      USERS.ops.sub,
+    ])
+    const r = await db.query<{ actor_name: string }>(
+      `select actor_name from public.audit_log where table_name = 'notes' order by id desc limit 1`,
+    )
+    expect(r.rows[0].actor_name).toBe('Opsy')
+    await db.query(`update public.members set nickname = null where email = 'ops@mdi.ac.in'`)
+  })
 })
 
 describe('deleting products', () => {

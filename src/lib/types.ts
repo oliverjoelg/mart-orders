@@ -21,7 +21,10 @@ export const ROLE_LABEL: Record<Role, string> = {
 export interface Member {
   id: string
   email: string
+  /** name from their Google account (synced at every sign-in) */
   display_name: string
+  /** optional; shown instead of the Google name when set */
+  nickname?: string | null
   role: Role
   active: boolean
   /** auth user id, set at first sign-in */
@@ -125,4 +128,9 @@ export interface ItemView extends OrderItem {
   buyer: Buyer
   product: Product
   handover: Handover | null
+}
+
+/** How a team member is named in the app: their nickname if set, else their Google name. */
+export function memberLabel(m: Pick<Member, 'display_name' | 'nickname'>): string {
+  return m.nickname?.trim() || m.display_name
 }

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { friendlyError, type Snapshot } from './api'
 import { useAuth } from './auth'
-import type { Buyer, Campaign, ItemView, Member, Note, Product } from './types'
+import { memberLabel, type Buyer, type Campaign, type ItemView, type Member, type Note, type Product } from './types'
 
 interface DataState {
   loading: boolean
@@ -116,7 +116,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       membersByUserId,
       memberName(userId) {
         if (!userId) return 'System'
-        return membersByUserId.get(userId)?.display_name ?? 'Unknown member'
+        const m = membersByUserId.get(userId)
+        return m ? memberLabel(m) : 'Unknown member'
       },
       refresh,
       lastLoaded,
