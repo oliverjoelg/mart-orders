@@ -1723,3 +1723,69 @@ details.disclosure summary::-webkit-details-marker {
     max-width: none;
   }
 }
+
+/* ---- phone fixes (2026-11-19) ---- */
+.toolbar .input-wrap .input {
+  width: 100%;
+}
+.round-chip {
+  max-width: 48%;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 99px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.bottom-nav a:focus,
+.bottom-nav button:focus {
+  outline: none;
+}
+.bottom-nav a:focus-visible,
+.bottom-nav button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -4px;
+  border-radius: 10px;
+}
+.inv-cards {
+  display: none;
+}
+@media (max-width: 767px) {
+  /* tab rows: wrap onto two lines instead of hiding options off-screen */
+  .segmented {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    overflow: visible;
+  }
+  .segmented button {
+    flex: 1 1 auto;
+    height: 34px;
+  }
+  /* inventory: one card per product instead of a wide grid */
+  .inv-grid {
+    display: none;
+  }
+  .inv-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .inv-card .size-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+  }
+  .bottom-nav a,
+  .bottom-nav button {
+    font-size: 11.5px;
+  }
+}

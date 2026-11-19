@@ -31,7 +31,7 @@ export default function Exports() {
   return (
     <div className="page">
       <PageHead
-        title="Exports"
+        title="Student lists"
         sub="Pick a list, then copy the emails into Bcc of your “come collect your item” mail."
       />
 

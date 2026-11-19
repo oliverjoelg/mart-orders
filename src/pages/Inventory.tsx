@@ -78,7 +78,7 @@ export default function Inventory() {
             <Empty icon={<Boxes size={20} />} title="No products">Add products on the Products page.</Empty>
           </div>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap inv-grid">
             <table className="table grid-table">
               <thead>
                 <tr>
@@ -146,6 +146,44 @@ export default function Inventory() {
             </table>
           </div>
         )}
+
+        {/* phones: one card per product, sizes listed top to bottom */}
+        <div className="inv-cards">
+          {inv.rows.map((r) => (
+            <div key={r.product.id} className="card inv-card">
+              <div className="card-head">
+                <h3><ProductLabel product={r.product} /></h3>
+                <span className="badge">{r.total[metric]} {m.label.toLowerCase()}</span>
+              </div>
+              {r.sizes
+                .filter((s) => (r.cells[s]?.[metric] ?? 0) > 0 || editSpare)
+                .map((s) => {
+                  const v = r.cells[s]?.[metric] ?? 0
+                  return (
+                    <div key={s} className="size-row" onClick={() => v > 0 && open(r.product.id, s)}>
+                      <span className="shirt-size" style={{ height: 32, minWidth: 40 }}>{s.length > 5 ? '…' : s}</span>
+                      <span className="muted" style={{ flex: 1, marginLeft: 10 }}>{s.length > 5 ? s : ''}</span>
+                      {editSpare ? (
+                        <input
+                          className="cell-input num"
+                          type="number"
+                          min={0}
+                          inputMode="numeric"
+                          defaultValue={v}
+                          aria-label={`Spare ${r.product.colour} ${s}`}
+                          onBlur={(e) => void saveSpare(r.product.id, s, e.target.value, v)}
+                        />
+                      ) : (
+                        <b className="num" style={{ fontSize: 16 }}>{v}</b>
+                      )}
+                    </div>
+                  )
+                })}
+              {!editSpare && r.total[metric] === 0 && <div className="size-row hint">None</div>}
+            </div>
+          ))}
+        </div>
+
         {sizes.some((s) => s.length > 6) && (
           <span className="hint">“Custom” columns are sizes typed into the form (e.g. chest/length). Hover for the full text.</span>
         )}
