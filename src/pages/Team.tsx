@@ -89,6 +89,7 @@ function People() {
                     {m.nickname && m.user_id && <span className="hint">({m.display_name})</span>}
                     {m.id === member?.id && <span className="badge">You</span>}
                     {!m.user_id && <span className="badge badge-amber">Not signed in yet</span>}
+                    {isBackupEmail(m.email) && <span className="badge" title="Personal email kept as a backup way in. Only super admins can see it.">Backup</span>}
                   </div>
                 </td>
                 <td className="mono muted">{m.email}</td>
@@ -108,7 +109,7 @@ function People() {
                   <span className="title">{memberLabel(m)}</span>
                   <RoleBadge role={m.role} />
                 </div>
-                <div className="hint mono">{m.email}{m.active ? '' : ' · off'}{m.user_id ? '' : ' · not signed in yet'}</div>
+                <div className="hint mono">{m.email}{isBackupEmail(m.email) ? ' · backup' : ''}{m.active ? '' : ' · off'}{m.user_id ? '' : ' · not signed in yet'}</div>
               </div>
             </div>
           ))}
@@ -150,6 +151,10 @@ function People() {
   )
 }
 
+function isBackupEmail(email: string) {
+  return !!email && !email.toLowerCase().endsWith('@mdi.ac.in')
+}
+
 function MemberModal({
   initial,
   roles,
@@ -173,8 +178,13 @@ function MemberModal({
   })
   const [busy, setBusy] = useState(false)
   const signedIn = !!initial.user_id
-  const emailOk = /^[^@\s]+@mdi\.ac\.in$/i.test(m.email.trim())
-  const options = roles.includes(m.role) ? roles : [m.role, ...roles]
+  const email = m.email.trim()
+  const isMdi = /^[^@\s]+@mdi\.ac\.in$/i.test(email)
+  // a personal (non-MDI) email is allowed only as a hidden backup super admin
+  const backup = !isMdi && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) && isSuperRole(m.role) && roles.includes(m.role)
+  const emailOk = isMdi || backup
+  const existingBackup = !!m.id && isBackupEmail(initial.email ?? '')
+  const options = existingBackup ? [m.role] : roles.includes(m.role) ? roles : [m.role, ...roles]
 
   return (
     <Modal
@@ -226,6 +236,7 @@ function MemberModal({
         <label htmlFor="m-email">MDI email</label>
         <input id="m-email" className="input mono" value={m.email} disabled={!!m.id} placeholder="name@mdi.ac.in" onChange={(e) => setM({ ...m, email: e.target.value })} />
         {m.email && !emailOk && <span className="hint" style={{ color: 'var(--red)' }}>Must be an @mdi.ac.in address</span>}
+        {backup && <span className="hint">Backup super admin: a personal email, hidden from everyone except super admins.</span>}
       </div>
       <div className="field">
         <label htmlFor="m-role">Role</label>
@@ -234,7 +245,7 @@ function MemberModal({
             <option key={r} value={r} disabled={!roles.includes(r)}>{roleName(r)}</option>
           ))}
         </select>
-        <span className="hint">What each role can do is set on the Permissions tab.</span>
+        <span className="hint">{existingBackup ? 'A backup account can only be a super admin. Remove it instead.' : 'What each role can do is set on the Permissions tab.'}</span>
       </div>
       <Switch checked={m.active} onChange={(v) => setM({ ...m, active: v })} label="Can sign in" />
     </Modal>

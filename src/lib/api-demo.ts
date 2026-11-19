@@ -459,7 +459,9 @@ export function createDemoApi(): Api {
     async saveMember(m) {
       await delay()
       if (!can(role, 'manageMembers')) deny()
-      if (!m.email.endsWith('@mdi.ac.in')) throw new Error('Team members need an @mdi.ac.in email')
+      if (!m.email.endsWith('@mdi.ac.in') && !isSuperRole(m.role)) {
+        throw new Error('Team members need an @mdi.ac.in email (only a super admin can use another email)')
+      }
       const existing = db.members.find((x) => x.id === m.id)
       if (existing) {
         const old = { ...existing }
