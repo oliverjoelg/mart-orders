@@ -140,7 +140,7 @@ export default function PrintList() {
         </div>
       ) : (
         <div className="stack">
-          <div className="table-wrap">
+          <div className="table-wrap hide-mobile">
             <table className="table grid-table">
               <thead>
                 <tr>

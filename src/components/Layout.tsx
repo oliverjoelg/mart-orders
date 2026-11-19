@@ -34,13 +34,13 @@ interface NavItem {
 }
 
 export const NAV: NavItem[] = [
-  { to: '/desk', label: 'Handover desk', short: 'Desk', icon: PackageCheck, group: 'Desk' },
+  { to: '/desk', label: 'Handover desk', short: 'Hand over', icon: PackageCheck, group: 'Desk' },
   { to: '/receive', label: 'Receive stock', short: 'Receive', icon: PackageOpen, group: 'Desk', need: 'setStatus' },
-  { to: '/', label: 'Overview', icon: LayoutDashboard, group: 'Stock' },
+  { to: '/', label: 'Overview', short: 'Home', icon: LayoutDashboard, group: 'Stock' },
   { to: '/items', label: 'Items', short: 'Items', icon: Shirt, group: 'Stock' },
   { to: '/inventory', label: 'Inventory', short: 'Stock', icon: Boxes, group: 'Stock' },
   { to: '/print', label: 'Vendor print list', icon: Printer, group: 'Stock' },
-  { to: '/exports', label: 'Exports', short: 'Export', icon: Send, group: 'Students' },
+  { to: '/exports', label: 'Student lists', short: 'Lists', icon: Send, group: 'Students' },
   { to: '/import', label: 'Add orders', icon: Upload, group: 'Data', need: 'import' },
   { to: '/activity', label: 'Activity', icon: History, group: 'Data' },
   { to: '/products', label: 'Products', icon: Tag, group: 'Settings' },
@@ -48,7 +48,8 @@ export const NAV: NavItem[] = [
 ]
 
 /** phone bottom bar: the first four tabs this role can use */
-const BOTTOM_CANDIDATES = ['/desk', '/receive', '/items', '/exports', '/inventory']
+// Phone bottom bar = the everyday jobs. Everything else is under More.
+const BOTTOM_CANDIDATES = ['/', '/desk', '/receive', '/exports', '/items']
 
 type Theme = 'dark' | 'light'
 
@@ -136,6 +137,7 @@ function DemoBanner() {
 
 export function Layout({ children }: { children: ReactNode }) {
   const { member, signOut } = useAuth()
+  const { campaign } = useData()
   const [theme, toggleTheme] = useTheme()
   const [more, setMore] = useState(false)
   const location = useLocation()
@@ -145,7 +147,13 @@ export function Layout({ children }: { children: ReactNode }) {
   const groups = [...new Set(items.map((i) => i.group))]
   const current = NAV.find((n) => (n.to === '/' ? location.pathname === '/' : location.pathname.startsWith(n.to)))
 
-  useEffect(() => setMore(false), [location.pathname])
+  useEffect(() => {
+    setMore(false)
+  }, [location.pathname])
+  // every new page starts at the top (phones kept the previous page's scroll position)
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [location.pathname])
 
   return (
     <div className="app">
@@ -203,8 +211,12 @@ export function Layout({ children }: { children: ReactNode }) {
         <DemoBanner />
         <header className="mobile-top">
           <BrandMark size={14} />
-          <div className="title">{current?.label ?? 'MART Orders'}</div>
-          {member && <RoleBadge role={member.role} />}
+          <div className="title">MART Orders</div>
+          {campaign && (
+            <button type="button" className="round-chip" onClick={() => setMore(true)} aria-label={`Sales round: ${campaign.name}. Tap to change`}>
+              {campaign.name}
+            </button>
+          )}
         </header>
         {children}
       </div>
@@ -219,7 +231,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </NavLink>
           )
         })}
-        <button type="button" onClick={() => setMore(true)} className={BOTTOM.includes(current?.to ?? '/desk') ? '' : 'active'}>
+        <button type="button" onClick={() => setMore(true)} className={current && BOTTOM.includes(current.to) ? '' : 'active'}>
           <Ellipsis size={20} strokeWidth={1.8} />
           More
         </button>
@@ -246,6 +258,7 @@ export function Layout({ children }: { children: ReactNode }) {
                   <div style={{ fontWeight: 500 }}>{memberLabel(member)}</div>
                   <div className="hint">{member.email}</div>
                 </div>
+                <RoleBadge role={member.role} />
               </div>
             )}
             <div className="row">
