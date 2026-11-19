@@ -24,7 +24,7 @@ function readRedirectError(): string | null {
   if (!desc) return null
   window.history.replaceState(null, '', window.location.pathname + '#/')
   if (/database error|team list/i.test(desc)) {
-    return 'That Google account is not on the MART team list. Ask a main admin or IT to add your @mdi.ac.in email.'
+    return 'That Google account is not on the MART team list. Ask the MART super admin or an admin to add your @mdi.ac.in email.'
   }
   return desc
 }

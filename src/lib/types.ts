@@ -1,4 +1,5 @@
-export type Role = 'main_admin' | 'admin' | 'ops' | 'it'
+/** main_admin is shown as "Super admin". (IT was merged into admin.) */
+export type Role = 'main_admin' | 'admin' | 'ops'
 export type ItemStatus = 'ordered' | 'sent_to_vendor' | 'received' | 'handed_over'
 export type HandoverType = 'self' | 'collected_by_other'
 
@@ -12,10 +13,9 @@ export const STATUS_LABEL: Record<ItemStatus, string> = {
 }
 
 export const ROLE_LABEL: Record<Role, string> = {
-  main_admin: 'Main admin',
+  main_admin: 'Super admin',
   admin: 'Admin',
   ops: 'Ops',
-  it: 'IT',
 }
 
 export interface Member {

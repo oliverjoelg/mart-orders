@@ -14,14 +14,9 @@ npx supabase db push
 
 or paste each file in `supabase/migrations/` into **SQL Editor** in filename order and run it.
 
-Then add yourself as the first main admin (SQL Editor; edit the email and name first):
-
-```sql
-insert into public.members (email, display_name, role)
-values ('your.name@mdi.ac.in', 'Your Name', 'main_admin');
-```
-
-Everyone else is added from the **Team** page in the app. Only `@mdi.ac.in` emails can be added.
+The last migration makes `pgdm26oliver_j@mdi.ac.in` the first super admin. Everyone else is
+added from the **Team & roles** tab in the app (super admin and admins only). Only `@mdi.ac.in`
+emails can be added.
 
 > The sign-up check is a trigger on `auth.users` (`enforce_member_signup`). If Supabase ever
 > refuses triggers on the auth schema, use **Authentication → Hooks → Before User Created**

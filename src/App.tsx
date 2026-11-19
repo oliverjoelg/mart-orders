@@ -17,6 +17,7 @@ import NotApproved from './pages/NotApproved'
 import Overview from './pages/Overview'
 import PrintList from './pages/PrintList'
 import Products from './pages/Products'
+import Receive from './pages/Receive'
 import Team from './pages/Team'
 
 function Shell() {
@@ -44,7 +45,8 @@ function Shell() {
             <Route path="/import" element={can(member?.role, 'import') ? <Import /> : <Navigate to="/" replace />} />
             <Route path="/activity" element={<Activity />} />
             <Route path="/products" element={<Products />} />
-            <Route path="/team" element={<Team />} />
+            <Route path="/receive" element={<Receive />} />
+            <Route path="/team" element={can(member?.role, 'manageMembers') ? <Team /> : <Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Gate>

@@ -270,15 +270,15 @@ export default function Items() {
 
       {selected.size > 0 && can(role, 'setStatus') && (
         <div className="bulk-bar">
-          <span className="count">{plural(selected.size, 'shirt')} selected</span>
+          <span className="count">{plural(selected.size, 'shirt')} selected · mark as:</span>
+          <button className="btn btn-sm" disabled={busy} onClick={() => void bulk('ordered')}>
+            Ordered
+          </button>
           <button className="btn btn-sm" disabled={busy} onClick={() => void bulk('sent_to_vendor')}>
             With vendor
           </button>
           <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => void bulk('received')}>
             In MART
-          </button>
-          <button className="btn btn-sm" disabled={busy} onClick={() => void bulk('ordered')}>
-            Ordered
           </button>
           <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setSelected(new Set())} aria-label="Clear selection">
             <X size={14} />

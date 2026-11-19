@@ -40,10 +40,11 @@ Supabase row-level security, not just the UI.
 
 | Role | Can do |
 |---|---|
-| Main admin | Everything, incl. managing users and roles |
-| Admin | Imports, edit orders/products, undo handovers, delete |
-| Ops | Mark received from vendor, handovers, exports (incl. emails for "come collect" mails), notes. Cannot delete |
-| IT | Manage team logins, run imports, view activity log; stock is read-only |
+| Super admin (`main_admin`) | Everything; adds and removes anyone. George for now |
+| Admin | Imports, edit orders/products, undo handovers, delete shirts; adds admins/ops and changes their roles (cannot touch a super admin or remove members) |
+| Ops | Receive stock from the vendor, handovers, exports (incl. emails for "come collect" mails), notes. Cannot delete |
+
+IT was merged into Admin on 2026-11-19 (see `docs/decisions.md`).
 
 ## Data model
 - `campaigns` — one sales round (e.g. Batch Tees 2026, Reopening round).

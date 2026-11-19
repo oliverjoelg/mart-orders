@@ -2,7 +2,7 @@
 -- One row per shirt in order_items. Status is a fixed enum. audit_log is filled by triggers
 -- (see 20261119120200_audit.sql); row-level security is in 20261119120100_security.sql.
 
-create type public.app_role as enum ('main_admin', 'admin', 'ops', 'it');
+create type public.app_role as enum ('main_admin', 'admin', 'ops');  -- main_admin = Super admin
 create type public.item_status as enum ('ordered', 'sent_to_vendor', 'received', 'handed_over');
 create type public.handover_type as enum ('self', 'collected_by_other');
 

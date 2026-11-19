@@ -6,6 +6,7 @@ import {
   LogOut,
   Moon,
   PackageCheck,
+  PackageOpen,
   Printer,
   Send,
   Shirt,
@@ -34,6 +35,7 @@ interface NavItem {
 
 export const NAV: NavItem[] = [
   { to: '/desk', label: 'Handover desk', short: 'Desk', icon: PackageCheck, group: 'Desk' },
+  { to: '/receive', label: 'Receive stock', short: 'Receive', icon: PackageOpen, group: 'Desk', need: 'setStatus' },
   { to: '/', label: 'Overview', icon: LayoutDashboard, group: 'Stock' },
   { to: '/items', label: 'Shirts', short: 'Shirts', icon: Shirt, group: 'Stock' },
   { to: '/inventory', label: 'Inventory', short: 'Stock', icon: Boxes, group: 'Stock' },
@@ -42,10 +44,11 @@ export const NAV: NavItem[] = [
   { to: '/import', label: 'Import CSV', icon: Upload, group: 'Data', need: 'import' },
   { to: '/activity', label: 'Activity', icon: History, group: 'Data' },
   { to: '/products', label: 'Products', icon: Tag, group: 'Settings' },
-  { to: '/team', label: 'Team', icon: Users, group: 'Settings' },
+  { to: '/team', label: 'Team & roles', icon: Users, group: 'Admin', need: 'manageMembers' },
 ]
 
-const BOTTOM = ['/desk', '/items', '/inventory', '/exports']
+/** phone bottom bar: the first four tabs this role can use */
+const BOTTOM_CANDIDATES = ['/desk', '/receive', '/items', '/exports', '/inventory']
 
 type Theme = 'dark' | 'light'
 
@@ -133,6 +136,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation()
   const role = member?.role
   const items = NAV.filter((n) => !n.need || can(role, n.need))
+  const BOTTOM = BOTTOM_CANDIDATES.filter((to) => items.some((i) => i.to === to)).slice(0, 4)
   const groups = [...new Set(items.map((i) => i.group))]
   const current = NAV.find((n) => (n.to === '/' ? location.pathname === '/' : location.pathname.startsWith(n.to)))
 

@@ -1,5 +1,7 @@
 import { ShieldCheck } from 'lucide-react'
+import { useState } from 'react'
 import { useAuth } from '../lib/auth'
+import { copyText } from '../lib/csv'
 
 function GoogleG() {
   return (
@@ -12,8 +14,18 @@ function GoogleG() {
   )
 }
 
+/**
+ * Google refuses sign-in inside apps' built-in browsers (WhatsApp, Instagram, LinkedIn...).
+ * Source: https://developers.googleblog.com/2016/08/modernizing-oauth-interactions-in-native-apps.html
+ */
+function inAppBrowser(): boolean {
+  return /; wv\)|FBAN|FBAV|Instagram|WhatsApp|LinkedInApp|Snapchat|Line\/|GSA\//i.test(navigator.userAgent)
+}
+
 export default function Login() {
   const { signIn, error, api } = useAuth()
+  const [copied, setCopied] = useState(false)
+  const embedded = api.mode !== 'demo' && inAppBrowser()
   return (
     <div className="login">
       <div className="card login-card">
@@ -27,6 +39,19 @@ export default function Login() {
           <p>Stock and handovers for the MDI Gurgaon campus store.</p>
         </div>
         {error && <div className="callout err" style={{ textAlign: 'left' }}>{error}</div>}
+        {embedded && (
+          <div className="callout warn" style={{ textAlign: 'left', flexDirection: 'column' }}>
+            <b>Open this page in Chrome to sign in.</b>
+            <span>Google blocks sign-in inside WhatsApp, Instagram and similar apps. Tap ⋮ → “Open in Chrome”, or copy the link.</span>
+            <button
+              className="btn btn-sm"
+              style={{ alignSelf: 'flex-start' }}
+              onClick={() => void copyText(window.location.href.split('#')[0]).then(() => setCopied(true))}
+            >
+              {copied ? 'Link copied' : 'Copy link'}
+            </button>
+          </div>
+        )}
         <button className="btn btn-lg btn-block google-btn" onClick={() => void signIn()}>
           <GoogleG />
           {api.mode === 'demo' ? 'Enter demo' : 'Sign in with Google'}

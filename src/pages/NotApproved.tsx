@@ -13,7 +13,7 @@ export default function NotApproved() {
           <h3>Not on the MART team list</h3>
           <p>
             You're signed in as <span className="mono">{user?.email}</span>, but this account isn't an active MART
-            team member. Ask a main admin or IT to add you on the Team page.
+            team member. Ask the MART super admin or an admin to add you.
           </p>
         </div>
         <button className="btn btn-block" onClick={() => void signOut()}>

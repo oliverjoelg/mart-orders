@@ -37,11 +37,11 @@ const SECTIONS = ['Section A', 'Section B', 'Section C', 'Section D', 'Section E
 const COURSES = ['PGDM', 'PGDM - HRM', 'PGDM - IB', 'PGDM - BFS']
 
 const DEMO_MEMBERS: Member[] = [
-  { id: 'm1', user_id: 'u1', email: 'main.admin@mdi.ac.in', display_name: 'Demo Main Admin', role: 'main_admin', active: true },
+  { id: 'm1', user_id: 'u1', email: 'super.admin@mdi.ac.in', display_name: 'Demo Super Admin', role: 'main_admin', active: true },
   { id: 'm2', user_id: 'u2', email: 'admin@mdi.ac.in', display_name: 'Priya Admin', role: 'admin', active: true },
   { id: 'm3', user_id: 'u3', email: 'ops.one@mdi.ac.in', display_name: 'Rahul Ops', role: 'ops', active: true },
   { id: 'm4', user_id: 'u4', email: 'ops.two@mdi.ac.in', display_name: 'Sneha Ops', role: 'ops', active: true },
-  { id: 'm5', user_id: 'u5', email: 'it@mdi.ac.in', display_name: 'Aman IT', role: 'it', active: true },
+  { id: 'm5', user_id: 'u5', email: 'admin.two@mdi.ac.in', display_name: 'Aman Admin', role: 'admin', active: true },
 ]
 const USER_ID: Record<string, string> = { m1: 'u1', m2: 'u2', m3: 'u3', m4: 'u4', m5: 'u5' }
 
@@ -385,6 +385,18 @@ export function createDemoApi(): Api {
         db.members.push(row)
         record('INSERT', 'members', row.id, null, null, row)
       }
+    },
+
+    async deleteMember(id) {
+      await delay()
+      if (role !== 'main_admin') throw new Error('Only the super admin can remove team members.')
+      const i = db.members.findIndex((m) => m.id === id)
+      const m = db.members[i]
+      if (m.role === 'main_admin' && db.members.filter((x) => x.role === 'main_admin' && x.active).length <= 1) {
+        throw new Error('There must always be at least one active super admin')
+      }
+      db.members.splice(i, 1)
+      record('DELETE', 'members', id, null, m, null)
     },
 
     async saveProduct(p) {

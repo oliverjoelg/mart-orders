@@ -151,6 +151,11 @@ export function createSupabaseApi(): Api {
       else check(await sb.from('members').insert(row))
     },
 
+    async deleteMember(id) {
+      const res = await sb.from('members').delete().eq('id', id).select('id')
+      if ((check(res) as unknown[]).length === 0) throw new Error('Only the super admin can remove team members.')
+    },
+
     async saveProduct(p) {
       const { id, ...rest } = p
       if (id) check(await sb.from('products').update(rest).eq('id', id))

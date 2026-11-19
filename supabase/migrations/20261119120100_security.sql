@@ -1,10 +1,11 @@
 -- MART Orders: who may do what, enforced in the database.
 --
---   main_admin  everything, incl. managing team members and roles
---   admin       imports, edit orders/products, undo handovers, delete
---   ops         mark received, handovers, spare stock, notes, exports. Cannot delete.
+--   main_admin  "Super admin": everything; adds and removes anyone, incl. other super admins
+--   admin       imports, edit orders/products, undo handovers, delete; adds admins/ops and
+--               changes their roles, but cannot touch a super admin or remove members
+--   ops         receive stock, handovers, spare stock, notes, exports. Cannot delete.
 --               May change only an item's status, never other columns.
---   it          manage ops/it logins, run imports, view activity log. Stock is read-only.
+-- (IT was merged into admin on 2026-11-19.)
 --
 -- Anyone signed in who is not an active member gets nothing (my_role() is null).
 
@@ -106,21 +107,22 @@ alter table public.audit_log    enable row level security;
 create policy members_select on public.members for select to authenticated
   using ((select public.my_role()) is not null);
 
--- main_admin may add anyone; it may add only ops/it.
+-- Team & roles: main_admin manages anyone; admin manages admin/ops but can neither
+-- create a super admin nor edit one. Ops cannot change the team at all.
 create policy members_insert on public.members for insert to authenticated
   with check (
     (select public.has_role('main_admin'))
-    or ((select public.has_role('it')) and role in ('ops', 'it'))
+    or ((select public.has_role('admin')) and role in ('admin', 'ops'))
   );
 
 create policy members_update on public.members for update to authenticated
   using (
     (select public.has_role('main_admin'))
-    or ((select public.has_role('it')) and role in ('ops', 'it'))
+    or ((select public.has_role('admin')) and role in ('admin', 'ops'))
   )
   with check (
     (select public.has_role('main_admin'))
-    or ((select public.has_role('it')) and role in ('ops', 'it'))
+    or ((select public.has_role('admin')) and role in ('admin', 'ops'))
   );
 
 create policy members_delete on public.members for delete to authenticated
@@ -172,21 +174,21 @@ create policy products_delete on public.products for delete to authenticated
   using ((select public.has_role('main_admin', 'admin')));
 
 -- ---------------------------------------------------------------------------
--- buyers, imports: imports are run by admins and IT
+-- buyers, imports: imports are run by admins
 create policy buyers_select on public.buyers for select to authenticated
   using ((select public.my_role()) is not null);
 create policy buyers_insert on public.buyers for insert to authenticated
-  with check ((select public.has_role('main_admin', 'admin', 'it')));
+  with check ((select public.has_role('main_admin', 'admin')));
 create policy buyers_update on public.buyers for update to authenticated
-  using ((select public.has_role('main_admin', 'admin', 'it')))
-  with check ((select public.has_role('main_admin', 'admin', 'it')));
+  using ((select public.has_role('main_admin', 'admin')))
+  with check ((select public.has_role('main_admin', 'admin')));
 create policy buyers_delete on public.buyers for delete to authenticated
   using ((select public.has_role('main_admin', 'admin')));
 
 create policy imports_select on public.imports for select to authenticated
   using ((select public.my_role()) is not null);
 create policy imports_insert on public.imports for insert to authenticated
-  with check ((select public.has_role('main_admin', 'admin', 'it')));
+  with check ((select public.has_role('main_admin', 'admin')));
 create policy imports_delete on public.imports for delete to authenticated
   using ((select public.has_role('main_admin', 'admin')));
 
@@ -195,7 +197,7 @@ create policy imports_delete on public.imports for delete to authenticated
 create policy items_select on public.order_items for select to authenticated
   using ((select public.my_role()) is not null);
 create policy items_insert on public.order_items for insert to authenticated
-  with check ((select public.has_role('main_admin', 'admin', 'it')));
+  with check ((select public.has_role('main_admin', 'admin')));
 create policy items_update on public.order_items for update to authenticated
   using ((select public.has_role('main_admin', 'admin', 'ops')))
   with check ((select public.has_role('main_admin', 'admin', 'ops')));

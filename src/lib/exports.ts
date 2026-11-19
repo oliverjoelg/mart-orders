@@ -4,9 +4,9 @@ import type { ItemView } from './types'
 export type ExportKind = 'call_list' | 'not_arrived' | 'collected'
 
 export const EXPORT_LABEL: Record<ExportKind, string> = {
-  call_list: 'Arrived, not collected',
-  not_arrived: 'Not yet arrived',
-  collected: 'Collected',
+  call_list: 'Ready to collect',
+  not_arrived: 'Not arrived yet',
+  collected: 'Already collected',
 }
 
 export interface ExportFilters {

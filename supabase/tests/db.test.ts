@@ -31,7 +31,6 @@ const USERS = {
   main: { sub: '00000000-0000-0000-0000-000000000001', email: 'main@mdi.ac.in', role: 'main_admin' },
   admin: { sub: '00000000-0000-0000-0000-000000000002', email: 'admin@mdi.ac.in', role: 'admin' },
   ops: { sub: '00000000-0000-0000-0000-000000000003', email: 'ops@mdi.ac.in', role: 'ops' },
-  it: { sub: '00000000-0000-0000-0000-000000000004', email: 'it@mdi.ac.in', role: 'it' },
   stranger: { sub: '00000000-0000-0000-0000-000000000009', email: 'someone@mdi.ac.in', role: null },
 } as const
 type Who = keyof typeof USERS
@@ -70,6 +69,9 @@ beforeAll(async () => {
   for (const f of readdirSync(MIGRATIONS).filter((x) => x.endsWith('.sql')).sort()) {
     await db.exec(readFileSync(join(MIGRATIONS, f), 'utf8'))
   }
+  // the migrations seed George as the first main admin; these tests use their own users
+  const seeded = await db.query<{ role: string }>(`select role from public.members where email = 'pgdm26oliver_j@mdi.ac.in'`)
+  expect(seeded.rows[0]?.role).toBe('main_admin')
   // seed members as the SQL editor would (superuser, no JWT)
   for (const u of Object.values(USERS)) {
     if (u.role) {
@@ -80,6 +82,7 @@ beforeAll(async () => {
       ])
     }
   }
+  await db.query(`delete from public.members where email = 'pgdm26oliver_j@mdi.ac.in'`)
   const p = await db.query<{ id: string; campaign_id: string }>(
     `select id, campaign_id from public.products where name = 'Classic MDI Navy Blue'`,
   )
@@ -87,7 +90,7 @@ beforeAll(async () => {
   campaignId = p.rows[0].campaign_id
 
   const res = await as<{ import_orders: { items_created: number } }>(
-    'it',
+    'admin',
     `select public.import_orders($1, 'fake.csv', 2, 0, $2::jsonb, $3::jsonb)`,
     [
       campaignId,
@@ -173,7 +176,7 @@ describe('who can see data', () => {
     expect(msg).toMatch(/permission denied/)
   })
   it('every member can read items', async () => {
-    for (const w of ['main', 'admin', 'ops', 'it'] as const) {
+    for (const w of ['main', 'admin', 'ops'] as const) {
       const r = await as(w, `select id from public.order_items`)
       expect(r.rows).toHaveLength(3)
     }
@@ -210,17 +213,48 @@ describe('Ops limits', () => {
   })
 })
 
-describe('IT limits', () => {
-  it('IT cannot change stock', async () => {
-    const msg = await fails(as('it', `select public.set_items_status($1, 'sent_to_vendor')`, [[itemId]]))
-    expect(msg).toMatch(/cannot change stock/)
+describe('roles', () => {
+  it('there is no separate IT role any more (merged into admin)', async () => {
+    const r = await db.query<{ v: string }>(`select unnest(enum_range(null::public.app_role))::text as v`)
+    expect(r.rows.map((x) => x.v)).toEqual(['main_admin', 'admin', 'ops'])
   })
-  it('IT can add ops members but not admins', async () => {
-    await as('it', `insert into public.members (email, display_name, role) values ('newops@mdi.ac.in', 'New Ops', 'ops')`)
+  it('the super admin can add, change and remove admins and ops', async () => {
+    await as('main', `insert into public.members (email, display_name, role) values ('temp.admin@mdi.ac.in', 'T', 'admin')`)
+    await as('main', `update public.members set role = 'ops' where email = 'temp.admin@mdi.ac.in'`)
+    await as('main', `delete from public.members where email = 'temp.admin@mdi.ac.in'`)
+    expect((await db.query(`select 1 from public.members where email = 'temp.admin@mdi.ac.in'`)).rows).toHaveLength(0)
+  })
+  it('Ops cannot add team members', async () => {
     const msg = await fails(
-      as('it', `insert into public.members (email, display_name, role) values ('boss@mdi.ac.in', 'B', 'admin')`),
+      as('ops', `insert into public.members (email, display_name, role) values ('x.ops@mdi.ac.in', 'X', 'ops')`),
     )
     expect(msg).toMatch(/row-level security/)
+  })
+})
+
+describe('Team & roles', () => {
+  it('an admin can add members and change roles', async () => {
+    await as('admin', `insert into public.members (email, display_name, role) values ('newops@mdi.ac.in', 'New Ops', 'ops')`)
+    await as('admin', `update public.members set role = 'admin' where email = 'newops@mdi.ac.in'`)
+    const r = await db.query<{ role: string }>(`select role from public.members where email = 'newops@mdi.ac.in'`)
+    expect(r.rows[0].role).toBe('admin')
+  })
+  it('an admin cannot create a main admin or edit one', async () => {
+    const msg = await fails(
+      as('admin', `insert into public.members (email, display_name, role) values ('boss@mdi.ac.in', 'B', 'main_admin')`),
+    )
+    expect(msg).toMatch(/row-level security/)
+    const promote = await fails(as('admin', `update public.members set role = 'main_admin' where email = 'newops@mdi.ac.in'`))
+    expect(promote).toMatch(/row-level security/)
+    await as('admin', `update public.members set active = false where email = 'main@mdi.ac.in'`)
+    const r = await db.query<{ active: boolean }>(`select active from public.members where email = 'main@mdi.ac.in'`)
+    expect(r.rows[0].active).toBe(true)
+  })
+  it('an admin cannot delete members; the main admin can', async () => {
+    await as('admin', `delete from public.members where email = 'newops@mdi.ac.in'`)
+    expect((await db.query(`select 1 from public.members where email = 'newops@mdi.ac.in'`)).rows).toHaveLength(1)
+    await as('main', `delete from public.members where email = 'newops@mdi.ac.in'`)
+    expect((await db.query(`select 1 from public.members where email = 'newops@mdi.ac.in'`)).rows).toHaveLength(0)
   })
 })
 
@@ -270,7 +304,7 @@ describe('audit log', () => {
     )
     const lines = r.rows.map((x) => `${x.table_name}:${x.action}:${x.actor_name}:${(x.changed ?? []).join(',')}`)
     expect(lines).toEqual([
-      'order_items:INSERT:it:',
+      'order_items:INSERT:admin:',
       'order_items:UPDATE:ops:status',
       'handovers:INSERT:ops:',
       'order_items:UPDATE:ops:status',

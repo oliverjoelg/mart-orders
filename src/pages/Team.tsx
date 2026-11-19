@@ -9,10 +9,9 @@ import { useData } from '../lib/store'
 import { ROLE_LABEL, type Member, type Role } from '../lib/types'
 
 const ROLE_HELP: Record<Role, string> = {
-  main_admin: 'Everything, including team and roles',
-  admin: 'Imports, edit shirts and products, undo handovers, delete',
-  ops: 'Mark received, hand over, exports, notes. Cannot delete',
-  it: 'Add Ops/IT logins, run imports, view activity. Stock is read-only',
+  main_admin: 'Everything. Adds and removes anyone, including other super admins',
+  admin: 'Imports, edit shirts and products, undo handovers, delete shirts; adds admins and ops (cannot remove members or touch a super admin)',
+  ops: 'Receive stock, hand over, exports, notes. Cannot delete anything',
 }
 
 export default function Team() {
@@ -30,8 +29,8 @@ export default function Team() {
   return (
     <div className="page">
       <PageHead
-        title="Team"
-        sub="Only people on this list can sign in. Use their @mdi.ac.in Google account."
+        title="Team & roles"
+        sub="Only people on this list can sign in, with their @mdi.ac.in Google account. Only admins see this page."
         actions={
           can(role, 'manageMembers') && (
             <button className="btn btn-primary" onClick={() => setEditing({ role: 'ops', active: true })}>
@@ -118,6 +117,20 @@ export default function Team() {
               toast.err(friendlyError(e))
             }
           }}
+          onRemove={
+            role === 'main_admin' && editing.id && editing.id !== member?.id
+              ? async () => {
+                  try {
+                    await api.deleteMember(editing.id!)
+                    toast.ok('Removed from the team')
+                    setEditing(null)
+                    await refresh()
+                  } catch (e) {
+                    toast.err(friendlyError(e))
+                  }
+                }
+              : undefined
+          }
         />
       )}
     </div>
@@ -129,11 +142,14 @@ function MemberModal({
   roles,
   onClose,
   onSave,
+  onRemove,
 }: {
   initial: Partial<Member>
   roles: Role[]
   onClose(): void
   onSave(m: { id?: string; email: string; display_name: string; role: Role; active: boolean }): Promise<void>
+  /** only passed for the super admin, on existing members */
+  onRemove?(): Promise<void>
 }) {
   const [m, setM] = useState({
     id: initial.id,
@@ -152,6 +168,21 @@ function MemberModal({
       onClose={onClose}
       footer={
         <>
+          {onRemove && (
+            <button
+              className="btn btn-danger"
+              style={{ marginRight: 'auto' }}
+              disabled={busy}
+              onClick={async () => {
+                if (!window.confirm(`Remove ${m.display_name} from the team? They will no longer be able to sign in.`)) return
+                setBusy(true)
+                await onRemove()
+                setBusy(false)
+              }}
+            >
+              Remove
+            </button>
+          )}
           <button className="btn" onClick={onClose}>Cancel</button>
           <button
             className="btn btn-primary"

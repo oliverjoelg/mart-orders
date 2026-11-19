@@ -30,7 +30,10 @@ export default function Exports() {
 
   return (
     <div className="page">
-      <PageHead title="Exports" sub="One line per student. Copy roll numbers or emails for the “come collect” mail." hideTitleOnMobile />
+      <PageHead
+        title="Exports"
+        sub="Pick a list, then copy the emails into Bcc of your “come collect your shirt” mail."
+      />
 
       <div className="stack">
         <Segmented
@@ -54,7 +57,7 @@ export default function Exports() {
               <Switch
                 checked={!!f.includePartly}
                 onChange={(v) => setF({ ...f, includePartly: v })}
-                label="Include partly arrived"
+                label="Also students with only some shirts ready"
               />
             )}
           </div>
@@ -80,8 +83,8 @@ export default function Exports() {
           {kind === 'call_list' && (
             <span className="hint">
               {f.includePartly
-                ? 'Students with at least one shirt in MART, even if others are still with the vendor.'
-                : 'Students whose shirts are all in MART (nothing still with the vendor), so they only come once.'}
+                ? 'Students with at least one shirt ready, even if their other shirts have not arrived.'
+                : 'Students whose shirts have ALL arrived, so they only need to come once.'}
             </span>
           )}
         </div>

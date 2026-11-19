@@ -393,6 +393,13 @@ textarea {
   grid-template-columns: 2fr 1fr;
   gap: 16px;
 }
+/* let wide tables scroll inside their card instead of stretching the page on phones */
+.grid-2 > *,
+.grid-3 > *,
+.stack > *,
+.main {
+  min-width: 0;
+}
 
 .stats {
   display: grid;
@@ -1073,6 +1080,10 @@ kbd {
 }
 .choice:hover {
   border-color: #444;
+}
+.choice:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 .choice.on {
   border-color: var(--accent);

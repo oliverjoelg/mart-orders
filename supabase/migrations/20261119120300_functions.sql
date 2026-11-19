@@ -110,7 +110,7 @@ declare
   v_buyers integer;
   v_missing text;
 begin
-  if not public.has_role('main_admin', 'admin', 'it') then
+  if not public.has_role('main_admin', 'admin') then
     raise exception 'Your role cannot run imports' using errcode = '42501';
   end if;
 

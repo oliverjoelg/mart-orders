@@ -77,6 +77,8 @@ export interface Api {
   activity(q: ActivityQuery): Promise<AuditEntry[]>
   itemHistory(itemId: string): Promise<AuditEntry[]>
   saveMember(m: { id?: string; email: string; display_name: string; role: Role; active: boolean }): Promise<void>
+  /** super admin only */
+  deleteMember(id: string): Promise<void>
   saveProduct(p: Partial<Product> & { campaign_id: string }): Promise<void>
   saveCampaign(c: { id?: string; name: string; is_active: boolean }): Promise<void>
   /** demo only: switch the pretend role */

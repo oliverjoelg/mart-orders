@@ -30,6 +30,7 @@ export default function Handover() {
   const [chosen, setChosen] = useState<Set<string>>(new Set())
   const [confirm, setConfirm] = useState(false)
   const [undoItem, setUndoItem] = useState<ItemView | null>(null)
+  const [done, setDone] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const role = member?.role
 
@@ -71,7 +72,8 @@ export default function Handover() {
     setBuyerId(id)
     window.scrollTo({ top: 0 })
   }
-  const next = () => {
+  /** back to an empty search, ready for the next student */
+  const reset = () => {
     setBuyerId(null)
     setQ('')
     setTimeout(() => inputRef.current?.focus(), 0)
@@ -87,7 +89,8 @@ export default function Handover() {
           compareSizes(a.size, b.size),
       )
     : []
-  const chosenItems = sorted.filter((i) => chosen.has(i.id) && i.status === 'received')
+  const readyCount = sorted.filter((i) => i.status === 'received').length
+  const chosenItems = sorted.filter((i) => i.status === 'received' && (readyCount === 1 || chosen.has(i.id)))
 
   return (
     <div className="page narrow">
@@ -112,6 +115,7 @@ export default function Handover() {
             onChange={(e) => {
               setQ(e.target.value)
               setBuyerId(null)
+              setDone(null)
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && results.length > 0) open(results[0].buyer.id)
@@ -122,7 +126,7 @@ export default function Handover() {
             <button
               className="btn btn-ghost btn-icon btn-sm"
               style={{ position: 'absolute', right: 8, top: 11 }}
-              onClick={next}
+              onClick={reset}
               aria-label="Clear search"
             >
               <X size={16} />
@@ -148,8 +152,8 @@ export default function Handover() {
                   </div>
                   <div className="counts">
                     {s.ready > 0 && <span className="badge badge-green">{s.ready} ready</span>}
-                    {s.pending > 0 && <span className="badge badge-amber">{s.pending} pending</span>}
-                    {s.done > 0 && <span className="badge badge-blue">{s.done} collected</span>}
+                    {s.pending > 0 && <span className="badge badge-amber">{s.pending} not arrived</span>}
+                    {s.done > 0 && <span className="badge badge-blue">{s.done} already taken</span>}
                   </div>
                   <ChevronRight size={16} className="subtle" />
                 </button>
@@ -159,10 +163,20 @@ export default function Handover() {
         </div>
       )}
 
-      {!student && !q.trim() && (
+      {!student && !q.trim() && done && (
+        <div className="callout ok" role="status" style={{ fontSize: 15, padding: '16px 18px', marginBottom: 12 }}>
+          <Check size={20} />
+          <div>
+            <b style={{ fontWeight: 600 }}>{done}</b>
+            <div style={{ opacity: 0.85 }}>Type the next roll number.</div>
+          </div>
+        </div>
+      )}
+
+      {!student && !q.trim() && !done && (
         <div className="card">
-          <Empty icon={<PackageCheck size={20} />} title="Find a student to hand over">
-            Type a roll number (e.g. the last 3 digits) or a name. Press Enter to open the first match.
+          <Empty icon={<PackageCheck size={20} />} title="Type the student's roll number">
+            Even the last 3 digits are enough. Then tap their name.
           </Empty>
         </div>
       )}
@@ -199,15 +213,21 @@ export default function Handover() {
                       }
                     }}
                   >
-                    <Check size={13} /> Done
+                    <Check size={13} /> Sorted
                   </button>
                 )}
               </div>
             ))}
           </div>
 
+          {readyCount > 1 && can(role, 'handover') && (
+            <div className="hint" style={{ padding: '0 16px 10px' }}>
+              All ready shirts are ticked. Untick any they are not taking today.
+            </div>
+          )}
           {sorted.map((i) => {
-            const selectable = i.status === 'received' && can(role, 'handover')
+            // with a single ready shirt there is nothing to choose, so no checkbox
+            const selectable = i.status === 'received' && can(role, 'handover') && readyCount > 1
             const on = chosen.has(i.id) && selectable
             return (
               <div
@@ -261,20 +281,17 @@ export default function Handover() {
             {can(role, 'handover') && student.ready > 0 ? (
               <button className="btn btn-primary btn-lg" style={{ flex: 1 }} disabled={chosenItems.length === 0} onClick={() => setConfirm(true)}>
                 <PackageCheck size={18} />
-                Hand over {chosenItems.length > 0 ? plural(chosenItems.length, 'shirt') : ''}
+                {chosenItems.length === 0 ? 'Tick a shirt to hand over' : `Hand over ${plural(chosenItems.length, 'shirt')}`}
               </button>
             ) : (
               <div className="muted" style={{ flex: 1, alignSelf: 'center' }}>
                 {student.ready === 0 && student.pending > 0
-                  ? 'Nothing in MART yet for this student.'
+                  ? 'Their shirts have not arrived yet. Nothing to hand over.'
                   : student.ready === 0
-                    ? 'Everything has been collected.'
-                    : 'Your role can view handovers but not record them.'}
+                    ? 'They have already taken all their shirts.'
+                    : 'Your role can see handovers but not record them.'}
               </div>
             )}
-            <button className="btn btn-lg" onClick={next}>
-              Next
-            </button>
           </div>
         </div>
       )}
@@ -284,8 +301,10 @@ export default function Handover() {
           student={student}
           items={chosenItems}
           onClose={() => setConfirm(false)}
-          onDone={async () => {
+          onDone={async (message) => {
             setConfirm(false)
+            setDone(message)
+            reset()
             await refresh()
           }}
         />
@@ -313,27 +332,32 @@ function ConfirmHandover({
   student: Student
   items: ItemView[]
   onClose(): void
-  onDone(): Promise<void>
+  onDone(message: string): Promise<void>
 }) {
   const { api } = useAuth()
   const toast = useToast()
-  const [type, setType] = useState<'self' | 'collected_by_other'>('self')
+  const [other, setOther] = useState(false)
   const [name, setName] = useState('')
   const [roll, setRoll] = useState('')
   const [busy, setBusy] = useState(false)
-  const valid = type === 'self' || (name.trim().length > 1 && roll.trim().length > 1)
+  const who = student.buyer.name || student.buyer.roll_no
+  const shirts = plural(items.length, 'shirt')
+  const them = items.length === 1 ? 'it' : 'them'
 
-  const submit = async () => {
+  const submit = async (type: 'self' | 'collected_by_other') => {
     setBusy(true)
     try {
-      const n = await api.recordHandover(
+      await api.recordHandover(
         items.map((i) => i.id),
         type,
         type === 'collected_by_other' ? name : undefined,
         type === 'collected_by_other' ? roll : undefined,
       )
-      toast.ok(`${plural(n, 'shirt')} handed over${type === 'self' ? '' : ` to ${name.trim()}`}`)
-      await onDone()
+      await onDone(
+        type === 'self'
+          ? `Done: ${shirts} given to ${who} (${student.buyer.roll_no}).`
+          : `Done: ${shirts} for ${who} given to ${name.trim()} (${roll.trim().toUpperCase()}).`,
+      )
     } catch (e) {
       toast.err(friendlyError(e))
       setBusy(false)
@@ -341,54 +365,51 @@ function ConfirmHandover({
   }
 
   return (
-    <Modal
-      title={`Hand over ${plural(items.length, 'shirt')}`}
-      onClose={onClose}
-      footer={
+    <Modal title={items.length === 1 ? 'Who is taking the shirt?' : 'Who is taking the shirts?'} onClose={onClose}>
+      <div className="hint">{items.map((i) => `${i.product.colour} ${i.size}`).join(' · ')}</div>
+      {!other ? (
         <>
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" disabled={!valid || busy} onClick={() => void submit()}>
-            <Check size={15} /> Confirm handover
+          <button type="button" className="btn btn-primary btn-lg btn-block" disabled={busy} onClick={() => void submit('self')}>
+            <UserRound size={18} /> {who} is taking {them}
+          </button>
+          <button type="button" className="btn btn-lg btn-block" disabled={busy} onClick={() => setOther(true)}>
+            <Users size={18} /> A friend is taking {them}
           </button>
         </>
-      }
-    >
-      <div className="hint">{items.map((i) => `${i.product.colour} ${i.size}`).join(' · ')}</div>
-      <button type="button" className={`choice${type === 'self' ? ' on' : ''}`} onClick={() => setType('self')}>
-        <UserRound size={18} />
-        <div>
-          <div className="title">To {student.buyer.name || 'the student'}</div>
-          <div className="hint">{student.buyer.roll_no} collected it themselves</div>
-        </div>
-      </button>
-      <button
-        type="button"
-        className={`choice${type === 'collected_by_other' ? ' on' : ''}`}
-        onClick={() => setType('collected_by_other')}
-      >
-        <Users size={18} />
-        <div>
-          <div className="title">Collected by someone else</div>
-          <div className="hint">A friend picks it up — note their name and roll number</div>
-        </div>
-      </button>
-      {type === 'collected_by_other' && (
-        <div className="grid-2" style={{ gap: 10 }}>
-          <div className="field">
-            <label htmlFor="col-name">Their name</label>
-            <input id="col-name" className="input" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+      ) : (
+        <>
+          <div className="callout">
+            <Users size={15} />
+            <div>Write down the friend's name and roll number, so we know who took {who}'s shirts.</div>
           </div>
-          <div className="field">
-            <label htmlFor="col-roll">Their roll number</label>
-            <input
-              id="col-roll"
-              className="input mono"
-              autoCapitalize="characters"
-              value={roll}
-              onChange={(e) => setRoll(e.target.value)}
-            />
+          <div className="grid-2" style={{ gap: 10 }}>
+            <div className="field">
+              <label htmlFor="col-name">Friend's name</label>
+              <input id="col-name" className="input" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="col-roll">Friend's roll number</label>
+              <input
+                id="col-roll"
+                className="input mono"
+                autoCapitalize="characters"
+                value={roll}
+                onChange={(e) => setRoll(e.target.value)}
+              />
+            </div>
           </div>
-        </div>
+          <button
+            type="button"
+            className="btn btn-primary btn-lg btn-block"
+            disabled={busy || name.trim().length < 2 || roll.trim().length < 2}
+            onClick={() => void submit('collected_by_other')}
+          >
+            <Check size={18} /> Give {shirts} to {name.trim() || 'the friend'}
+          </button>
+          <button type="button" className="btn btn-ghost btn-block" onClick={() => setOther(false)}>
+            Back
+          </button>
+        </>
       )}
     </Modal>
   )
