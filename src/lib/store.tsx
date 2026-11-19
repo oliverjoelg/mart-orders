@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { friendlyError, type Snapshot } from './api'
 import { useAuth } from './auth'
+import { setPermissionData } from './permissions'
 import { memberLabel, type Buyer, type Campaign, type ItemView, type Member, type Note, type Product } from './types'
 
 interface DataState {
@@ -68,8 +69,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [refresh, lastLoaded])
 
   const value = useMemo<DataState>(() => {
+    // roles & ticks drive can(); refresh them before any page renders with this data
+    setPermissionData(snapshot?.roles ?? [], snapshot?.rolePermissions ?? [])
     const campaigns = [...(snapshot?.campaigns ?? [])].sort(
-      (a, b) => Number(b.is_active) - Number(a.is_active) || (b.created_at ?? '').localeCompare(a.created_at ?? ''),
+      (a, b) => Number(!!a.locked) - Number(!!b.locked) || Number(b.is_active) - Number(a.is_active) || (b.created_at ?? '').localeCompare(a.created_at ?? ''),
     )
     const campaign = campaigns.find((c) => c.id === campaignId) ?? campaigns[0] ?? null
     const buyersById = new Map((snapshot?.buyers ?? []).map((b) => [b.id, b]))

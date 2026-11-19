@@ -1,11 +1,11 @@
-import { Plus } from 'lucide-react'
+import { Lock, Plus, Unlock } from 'lucide-react'
 import { useState } from 'react'
 import { useToast } from '../components/Toast'
 import { Modal, PageHead, ProductLabel } from '../components/ui'
 import { friendlyError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { inr } from '../lib/format'
-import { can } from '../lib/permissions'
+import { can, isSuperRole } from '../lib/permissions'
 import { useData } from '../lib/store'
 import type { Product } from '../lib/types'
 
@@ -18,6 +18,7 @@ export default function Products() {
   const [editing, setEditing] = useState<Partial<Product> | null>(null)
   const [newRound, setNewRound] = useState<string | null>(null)
   const admin = can(member?.role, 'editProducts')
+  const superAdmin = isSuperRole(member?.role)
 
   const save = async (fn: () => Promise<void>, ok: string) => {
     try {
@@ -98,15 +99,29 @@ export default function Products() {
               <div className="body">
                 <b style={{ fontWeight: 500 }}>{c.name}</b>{' '}
                 {c.id === campaign?.id && <span className="badge badge-green">Showing</span>}{' '}
-                {!c.is_active && <span className="badge">Closed</span>}
+                {!c.is_active && <span className="badge">Closed</span>}{' '}
+                {c.locked && <span className="badge badge-amber"><Lock size={11} /> Locked — only super admins see it</span>}
               </div>
               {c.id !== campaign?.id && <button className="btn btn-sm" onClick={() => setCampaignId(c.id)}>Show</button>}
-              {admin && (
+              {admin && !c.locked && (
                 <button
                   className="btn btn-sm btn-ghost"
                   onClick={() => void save(() => api.saveCampaign({ id: c.id, name: c.name, is_active: !c.is_active }), c.is_active ? 'Round closed' : 'Round reopened')}
                 >
                   {c.is_active ? 'Close' : 'Reopen'}
+                </button>
+              )}
+              {superAdmin && (
+                <button
+                  className={`btn btn-sm${c.locked ? ' btn-outline-accent' : ''}`}
+                  onClick={() => {
+                    if (!c.locked && !window.confirm(`Lock “${c.name}”?
+
+Only super admins will see it, and nobody can change anything in it until you unlock it.`)) return
+                    void save(() => api.setCampaignLocked(c.id, !c.locked), c.locked ? 'Round unlocked: everyone can see it again' : 'Round locked: hidden from everyone but super admins')
+                  }}
+                >
+                  {c.locked ? <><Unlock size={13} /> Unlock</> : <><Lock size={13} /> Lock</>}
                 </button>
               )}
             </div>

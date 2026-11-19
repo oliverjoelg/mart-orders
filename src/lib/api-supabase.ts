@@ -10,13 +10,13 @@ function check<T>(res: { data: T; error: PostgrestError | null }): T {
   return res.data
 }
 
-async function fetchAll<T>(table: string, whereNull?: string): Promise<T[]> {
+async function fetchAll<T>(table: string, whereNull?: string, orderBy = 'id'): Promise<T[]> {
   const sb = getSupabase()
   const out: T[] = []
   for (let from = 0; ; from += PAGE) {
     let q = sb.from(table).select('*')
     if (whereNull) q = q.is(whereNull, null)
-    const res = await q.order('id', { ascending: true }).range(from, from + PAGE - 1)
+    const res = await q.order(orderBy, { ascending: true }).range(from, from + PAGE - 1)
     const rows = check(res) as T[]
     out.push(...rows)
     if (rows.length < PAGE) break
@@ -61,7 +61,7 @@ export function createSupabaseApi(): Api {
     },
 
     async loadSnapshot(): Promise<Snapshot> {
-      const [campaigns, products, buyers, items, handovers, notes, spare, members] = await Promise.all([
+      const [campaigns, products, buyers, items, handovers, notes, spare, members, roles, permissions, rolePermissions] = await Promise.all([
         fetchAll<Snapshot['campaigns'][number]>('campaigns'),
         fetchAll<Snapshot['products'][number]>('products'),
         fetchAll<Snapshot['buyers'][number]>('buyers'),
@@ -70,8 +70,11 @@ export function createSupabaseApi(): Api {
         fetchAll<Snapshot['notes'][number]>('notes'),
         fetchAll<Snapshot['spare'][number]>('spare_stock'),
         fetchAll<Snapshot['members'][number]>('members'),
+        fetchAll<Snapshot['roles'][number]>('roles', undefined, 'sort_order'),
+        fetchAll<Snapshot['permissions'][number]>('permissions', undefined, 'sort_order'),
+        fetchAll<Snapshot['rolePermissions'][number]>('role_permissions', undefined, 'role_key'),
       ])
-      return { campaigns, products, buyers, items, handovers, notes, spare, members }
+      return { campaigns, products, buyers, items, handovers, notes, spare, members, roles, permissions, rolePermissions }
     },
 
     async setItemsStatus(ids, status) {
@@ -178,6 +181,33 @@ export function createSupabaseApi(): Api {
         throw new Error(res.error.message)
       }
       if ((res.data ?? []).length === 0) throw new Error("Your role isn't allowed to delete products.")
+    },
+
+    async setCampaignLocked(id, locked) {
+      const res = await sb.from('campaigns').update({ locked }).eq('id', id).select('id')
+      if ((check(res) as unknown[]).length === 0) throw new Error('Only a super admin can lock or unlock a sales round.')
+    },
+
+    async saveRole(r) {
+      if (r.key) {
+        check(await sb.from('roles').update({ name: r.name.trim() }).eq('key', r.key))
+        return
+      }
+      const key = r.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 28) || 'role'
+      check(await sb.from('roles').insert({ key: /^[a-z]/.test(key) ? key : `r_${key}`, name: r.name.trim() }))
+    },
+
+    async deleteRole(key) {
+      const res = await sb.from('roles').delete().eq('key', key).select('key')
+      if (res.error) {
+        if (/foreign key/i.test(res.error.message)) throw new Error('Move everyone off this role first, then delete it.')
+        throw new Error(res.error.message)
+      }
+    },
+
+    async setPermission(roleKey, permission, allowed) {
+      if (allowed) check(await sb.from('role_permissions').upsert({ role_key: roleKey, permission }, { onConflict: 'role_key,permission' }))
+      else check(await sb.from('role_permissions').delete().eq('role_key', roleKey).eq('permission', permission))
     },
 
     async saveCampaign(c) {

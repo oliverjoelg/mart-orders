@@ -13,6 +13,7 @@ import type {
   SpareStock,
 } from './types'
 import type { ParsedBuyer } from './import/parseForm'
+import type { PermissionRow, RolePermissionRow, RoleRow } from './permissions'
 
 export interface Snapshot {
   campaigns: Campaign[]
@@ -24,6 +25,9 @@ export interface Snapshot {
   notes: Note[]
   spare: SpareStock[]
   members: Member[]
+  roles: RoleRow[]
+  permissions: PermissionRow[]
+  rolePermissions: RolePermissionRow[]
 }
 
 export interface AuthUser {
@@ -84,6 +88,12 @@ export interface Api {
   /** admins; the database refuses if any order uses the product */
   deleteProduct(id: string): Promise<void>
   saveCampaign(c: { id?: string; name: string; is_active: boolean }): Promise<void>
+  /** super admin only: hide + freeze (true) or bring back (false) a sales round */
+  setCampaignLocked(id: string, locked: boolean): Promise<void>
+  /** super admin only */
+  saveRole(r: { key?: string; name: string }): Promise<void>
+  deleteRole(key: string): Promise<void>
+  setPermission(roleKey: string, permission: string, allowed: boolean): Promise<void>
   /** demo only: switch the pretend role */
   setDemoRole?(role: Role): void
 }

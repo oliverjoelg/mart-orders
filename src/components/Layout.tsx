@@ -1,5 +1,6 @@
 import {
   Boxes,
+  Lock,
   Ellipsis,
   History,
   LayoutDashboard,
@@ -21,7 +22,8 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { can, type Action } from '../lib/permissions'
 import { useData } from '../lib/store'
-import { memberLabel, ROLE_LABEL, type Role } from '../lib/types'
+import { allRoles } from '../lib/permissions'
+import { memberLabel, type Role } from '../lib/types'
 import { Avatar, Modal, RoleBadge } from './ui'
 
 interface NavItem {
@@ -34,22 +36,22 @@ interface NavItem {
 }
 
 export const NAV: NavItem[] = [
-  { to: '/desk', label: 'Handover desk', short: 'Hand over', icon: PackageCheck, group: 'Desk' },
+  { to: '/desk', label: 'Handover desk', short: 'Hand over', icon: PackageCheck, group: 'Desk', need: 'pageDesk' },
   { to: '/receive', label: 'Receive stock', short: 'Receive', icon: PackageOpen, group: 'Desk', need: 'setStatus' },
-  { to: '/', label: 'Overview', short: 'Home', icon: LayoutDashboard, group: 'Stock' },
-  { to: '/items', label: 'Items', short: 'Items', icon: Shirt, group: 'Stock' },
-  { to: '/inventory', label: 'Inventory', short: 'Stock', icon: Boxes, group: 'Stock' },
-  { to: '/print', label: 'Vendor print list', icon: Printer, group: 'Stock' },
-  { to: '/exports', label: 'Student lists', short: 'Lists', icon: Send, group: 'Students' },
+  { to: '/', label: 'Overview', short: 'Home', icon: LayoutDashboard, group: 'Stock', need: 'pageHome' },
+  { to: '/items', label: 'Items', short: 'Items', icon: Shirt, group: 'Stock', need: 'pageItems' },
+  { to: '/inventory', label: 'Inventory', short: 'Stock', icon: Boxes, group: 'Stock', need: 'pageInventory' },
+  { to: '/print', label: 'Vendor print list', icon: Printer, group: 'Stock', need: 'pagePrint' },
+  { to: '/exports', label: 'Student lists', short: 'Lists', icon: Send, group: 'Students', need: 'pageLists' },
   { to: '/import', label: 'Add orders', icon: Upload, group: 'Data', need: 'import' },
-  { to: '/activity', label: 'Activity', icon: History, group: 'Data' },
-  { to: '/products', label: 'Products', icon: Tag, group: 'Settings' },
-  { to: '/team', label: 'Team & roles', icon: Users, group: 'Admin', need: 'manageMembers' },
+  { to: '/activity', label: 'Activity', icon: History, group: 'Data', need: 'pageActivity' },
+  { to: '/products', label: 'Products', icon: Tag, group: 'Settings', need: 'pageProducts' },
+  { to: '/team', label: 'Roles & permissions', short: 'Team', icon: Users, group: 'Admin', need: 'manageMembers' },
 ]
 
 /** phone bottom bar: the first four tabs this role can use */
 // Phone bottom bar = the everyday jobs. Everything else is under More.
-const BOTTOM_CANDIDATES = ['/', '/desk', '/receive', '/exports', '/items']
+const BOTTOM_CANDIDATES = ['/', '/desk', '/receive', '/exports', '/items', '/inventory', '/print', '/activity']
 
 type Theme = 'dark' | 'light'
 
@@ -124,9 +126,9 @@ function DemoBanner() {
           onChange={(e) => api.setDemoRole?.(e.target.value as Role)}
           aria-label="Demo role"
         >
-          {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
-            <option key={r} value={r}>
-              {ROLE_LABEL[r]}
+          {allRoles().map((r) => (
+            <option key={r.key} value={r.key as Role}>
+              {r.name}
             </option>
           ))}
         </select>
@@ -218,6 +220,12 @@ export function Layout({ children }: { children: ReactNode }) {
             </button>
           )}
         </header>
+        {campaign?.locked && (
+          <div className="demo-banner" style={{ color: 'var(--amber)' }} role="status">
+            <Lock size={13} /> “{campaign.name}” is locked: only super admins can see it, and nothing in it can be changed.
+            <Link to="/products" style={{ textDecoration: 'underline' }}>Unlock on Products</Link>
+          </div>
+        )}
         {children}
       </div>
 
