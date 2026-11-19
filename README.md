@@ -3,6 +3,7 @@
 Inventory and handover tracker for MART, the student-run campus store at MDI Gurgaon.
 Replaces the Excel "working file" for batch T-shirts. Spec: [PRODUCT-BRIEF.md](PRODUCT-BRIEF.md).
 Decisions: [docs/decisions.md](docs/decisions.md). First-time setup: [docs/SETUP.md](docs/SETUP.md).
+Prod checklist: [docs/TEST-PLAN.md](docs/TEST-PLAN.md).
 
 - **Frontend:** Vite + React + TypeScript, static site on GitHub Pages (`/mart-orders/`).
 - **Backend:** Supabase (Postgres + Google sign-in). Row-level security and audit triggers in
