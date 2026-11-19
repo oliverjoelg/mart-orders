@@ -341,6 +341,13 @@ export default function Payments() {
 
           {check === 'none' ? (
             <NoPaymentList buyers={calc.noPayment} cost={calc.cost} canAdd={canCheck} onAdd={(b) => { setAddFor(b); setEditing('new') }} />
+          ) : payments.length === 0 ? (
+            <div className="card">
+              <Empty icon={<Wallet size={20} />} title="No payment details saved yet">
+                These orders were added before payments were tracked. On Add orders, upload the same Google Form file again:
+                only the payment details are saved, nothing is imported twice.
+              </Empty>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="card">
               <Empty icon={<Wallet size={20} />} title="No payments match">Try fewer filters.</Empty>
