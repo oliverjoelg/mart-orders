@@ -86,8 +86,9 @@ export interface Api {
   updateItem(id: string, patch: Partial<Pick<OrderItem, 'size' | 'print_name' | 'batch' | 'product_id'>>): Promise<void>
   deleteItem(id: string): Promise<void>
   importOrders(args: ImportArgs): Promise<{ items_created: number }>
-  addNote(note: { buyer_id?: string | null; item_id?: string | null; body: string; is_flag: boolean }): Promise<void>
-  setNoteResolved(id: string, resolved: boolean): Promise<void>
+  /** Returns the saved note so the screen can show it without reloading. */
+  addNote(note: { buyer_id?: string | null; item_id?: string | null; body: string; is_flag: boolean }): Promise<Note>
+  setNoteResolved(id: string, resolved: boolean): Promise<Note>
   setSpare(productId: string, size: string, quantity: number): Promise<void>
   activity(q: ActivityQuery): Promise<AuditEntry[]>
   itemHistory(itemId: string): Promise<AuditEntry[]>

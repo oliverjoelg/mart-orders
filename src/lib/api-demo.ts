@@ -417,6 +417,7 @@ export function createDemoApi(): Api {
       }
       db.notes.push(note)
       record('INSERT', 'notes', note.id, note.item_id, null, { ...note })
+      return clone(note)
     },
 
     async setNoteResolved(id, resolved) {
@@ -426,6 +427,7 @@ export function createDemoApi(): Api {
       const old = { ...n }
       n.resolved = resolved
       record('UPDATE', 'notes', id, n.item_id, old, { ...n })
+      return clone(n)
     },
 
     async setSpare(productId, size, quantity) {

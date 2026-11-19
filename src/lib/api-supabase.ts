@@ -1,7 +1,7 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 import { pickCampaign, type ActivityQuery, type Api, type AuthUser, type ImportArgs, type Snapshot } from './api'
 import { getSupabase } from './supabase'
-import type { AuditEntry, Buyer, Handover, Member, OrderItem } from './types'
+import type { AuditEntry, Buyer, Handover, Member, Note, OrderItem } from './types'
 
 
 
@@ -178,11 +178,11 @@ export function createSupabaseApi(): Api {
 
     async addNote(n) {
       const { data } = await sb.auth.getUser()
-      check(await sb.from('notes').insert({ ...n, created_by: data.user?.id }))
+      return check(await sb.from('notes').insert({ ...n, created_by: data.user?.id }).select().single()) as Note
     },
 
     async setNoteResolved(id, resolved) {
-      check(await sb.from('notes').update({ resolved }).eq('id', id))
+      return check(await sb.from('notes').update({ resolved }).eq('id', id).select().single()) as Note
     },
 
     async setSpare(productId, size, quantity) {

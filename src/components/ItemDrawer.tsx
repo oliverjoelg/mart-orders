@@ -75,7 +75,7 @@ export function ItemDrawer({ itemId, onClose }: { itemId: string; onClose(): voi
 
 function ItemDrawerInner({ item, onClose }: { item: ItemView; onClose(): void }) {
   const { api, member } = useAuth()
-  const { refresh, refreshItems, memberName, products, snapshot } = useData()
+  const { refresh, refreshItems, putNotes, memberName, products, snapshot } = useData()
   const toast = useToast()
   const ctx = useDescribeCtx()
   const role = member?.role
@@ -92,7 +92,7 @@ function ItemDrawerInner({ item, onClose }: { item: ItemView; onClose(): void })
     return () => {
       live = false
     }
-  }, [api, item.id, item.status, item.size, item.print_name])
+  }, [api, item.id, item.status, item.size, item.print_name, notes.length])
 
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     setBusy(true)
@@ -259,7 +259,7 @@ function ItemDrawerInner({ item, onClose }: { item: ItemView; onClose(): void })
               className="btn"
               disabled={!note.trim() || busy}
               onClick={() =>
-                void run(() => api.addNote({ item_id: item.id, buyer_id: item.buyer_id, body: note.trim(), is_flag: true }), 'Note added').then(() =>
+                void run(async () => putNotes([await api.addNote({ item_id: item.id, buyer_id: item.buyer_id, body: note.trim(), is_flag: true })]), 'Note added').then(() =>
                   setNote(''),
                 )
               }
