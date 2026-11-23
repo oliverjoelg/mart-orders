@@ -9,7 +9,8 @@
 --   get_order_form()  what the form shows (open round, products, prices, sizes, live QR)
 --   submit_order()    saves buyer + one order_items row per item + a payments row, atomically
 --   my_orders()       their own orders and statuses
--- Form admins use RLS on the form_* tables plus form_admin_* functions.
+-- Form admins use RLS on the form_* tables plus form_admin_* functions. They change only what the
+-- form shows (open/close, photos, descriptions, QRs), never MART data such as prices or sizes.
 
 -- ---------------------------------------------------------------------------
 -- 1. who is calling
@@ -517,14 +518,14 @@ begin
 end;
 $$;
 
--- Price and sizes live on the MART product (logged in its activity feed); the rest is form-only.
---   p: {price_inr, sizes[], shown, description, photo_paths[], allow_custom_size}
+-- Form-only display settings for a product. Form admins never change MART data (Oliver,
+-- 2026-11-23): name, colour, price and sizes are read from public.products and edited only in
+-- MART Orders (Products page, "Manage sales rounds & products").
+--   p: {shown, description, photo_paths[], allow_custom_size}
 create or replace function public.form_admin_save_product(p_product_id uuid, p jsonb)
 returns void
 language plpgsql security definer set search_path = ''
 as $$
-declare
-  v_sizes text[];
 begin
   if not public.is_form_admin() then
     raise exception 'Only form admins can do this' using errcode = '42501';
@@ -532,16 +533,9 @@ begin
   if not exists (select 1 from public.products where id = p_product_id) then
     raise exception 'Unknown product';
   end if;
-  if p ? 'sizes' then
-    select coalesce(array_agg(upper(btrim(s)) order by o), '{}') into v_sizes
-      from jsonb_array_elements_text(p -> 'sizes') with ordinality as t(s, o) where btrim(s) <> '';
+  if p ?| array['price_inr', 'sizes', 'name', 'colour'] then
+    raise exception 'Prices, sizes and names are changed in MART Orders, not on the order form' using errcode = '42501';
   end if;
-  update public.products
-     set price_inr = coalesce((p ->> 'price_inr')::integer, price_inr),
-         sizes = coalesce(v_sizes, sizes)
-   where id = p_product_id
-     and (price_inr is distinct from coalesce((p ->> 'price_inr')::integer, price_inr)
-          or sizes is distinct from coalesce(v_sizes, sizes));
   insert into public.form_products (product_id, shown, description, photo_paths, allow_custom_size)
   values (p_product_id, coalesce((p ->> 'shown')::boolean, true), nullif(btrim(p ->> 'description'), ''),
           coalesce(array(select jsonb_array_elements_text(p -> 'photo_paths')), '{}'),

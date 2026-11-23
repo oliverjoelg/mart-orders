@@ -661,15 +661,22 @@ describe('order form', () => {
     it('a form admin opens the round, sets products and a live QR', async () => {
       await as('formadmin', `select public.form_admin_set_open($1, true)`, [campaignId])
       await as('formadmin', `select public.form_admin_save_product($1, $2::jsonb)`, [productId, JSON.stringify({ shown: true, allow_custom_size: true, description: 'Classic' })])
-      await as('formadmin', `select public.form_admin_save_product($1, $2::jsonb)`, [pinkId, JSON.stringify({ shown: true, price_inr: 700 })])
+      await as('formadmin', `select public.form_admin_save_product($1, $2::jsonb)`, [pinkId, JSON.stringify({ shown: true })])
       const q = await as<{ id: string }>('formadmin', `insert into public.form_payment_qrs (payee_name, image_path) values ('Animesh', 'qr/animesh.png') returning id`)
       qrId = q.rows[0].id
       await as('formadmin', `select public.form_admin_set_active_qr($1)`, [qrId])
-      const p = await db.query<{ price_inr: number }>(`select price_inr from public.products where id = $1`, [pinkId])
-      expect(p.rows[0].price_inr).toBe(700)
-      // the price change is in the MART activity log, by the form admin
-      const a = await db.query<{ actor_email: string }>(`select actor_email from public.audit_log where table_name = 'products' and row_id = $1 order by id desc limit 1`, [pinkId])
-      expect(a.rows[0].actor_email).toBe('formadmin@mdi.ac.in')
+    })
+    it('a form admin cannot change prices, sizes or names: those stay in MART Orders', async () => {
+      const before = await db.query(`select id, name, colour, price_inr, sizes, updated_at from public.products order by id`)
+      for (const patch of [{ price_inr: 1 }, { sizes: ['M'] }, { name: 'X' }, { shown: true, price_inr: 699 }]) {
+        expect(await fails(as('formadmin', `select public.form_admin_save_product($1, $2::jsonb)`, [pinkId, JSON.stringify(patch)]))).toMatch(/changed in MART Orders/)
+      }
+      await as('formadmin', `update public.products set price_inr = 1, sizes = '{M}'`) // RLS: touches no rows
+      const after = await db.query(`select id, name, colour, price_inr, sizes, updated_at from public.products order by id`)
+      expect(after.rows).toEqual(before.rows)
+      // nothing the form admin did shows up as a change to MART data
+      const a = await db.query<{ n: number }>(`select count(*)::int as n from public.audit_log where actor_email = 'formadmin@mdi.ac.in'`)
+      expect(a.rows[0].n).toBe(0)
     })
     it('students and MART admins cannot use form admin functions', async () => {
       for (const w of ['student', 'admin'] as const) {
@@ -722,7 +729,7 @@ describe('order form', () => {
     })
     it('saves buyer, one item per row and a payment in one go; the total comes from the database', async () => {
       const r = await submit('student', [item(), item({ product_id: pinkId, size: 'xxs', print_name: null })])
-      expect(r.rows[0].submit_order).toMatchObject({ items: 2, total_inr: 699 + 700 })
+      expect(r.rows[0].submit_order).toMatchObject({ items: 2, total_inr: 699 + 699 })
       const items = await db.query<{ size: string; print_name: string | null; batch: string; source_slot: number }>(
         `select i.size, i.print_name, i.batch, i.source_slot from public.order_items i join public.buyers b on b.id = i.buyer_id
           where b.roll_no = 'PGP26-500' order by i.source_slot`)
@@ -734,7 +741,7 @@ describe('order form', () => {
       expect(b.rows[0]).toEqual({ phone: '9876543210', user_id: USERS.student.sub, email: 'student@mdi.ac.in' })
       const pay = await db.query<{ amount_paid: number; paid_to: string; status: string; txn_id: string }>(
         `select amount_paid, paid_to, status, txn_id from public.payments where screenshot_path = $1`, [STUDENT_SHOT])
-      expect(pay.rows[0]).toEqual({ amount_paid: 1399, paid_to: 'Animesh', status: 'unchecked', txn_id: '412345678901' })
+      expect(pay.rows[0]).toEqual({ amount_paid: 1398, paid_to: 'Animesh', status: 'unchecked', txn_id: '412345678901' })
     })
     it('shows up in MART Orders straight away, with the student in the activity log', async () => {
       const r = await as<{ n: number }>('ops', `select count(*)::int as n from public.order_items where form_order_id is not null`)
@@ -757,7 +764,7 @@ describe('order form', () => {
       const r = await as<{ my_orders: { total_inr: number; payment_status: string; items: { status: string; size: string }[] }[] }>('student', `select public.my_orders()`)
       expect(r.rows[0].my_orders).toHaveLength(1)
       const o = r.rows[0].my_orders[0]
-      expect(o).toMatchObject({ total_inr: 1399, payment_status: 'unchecked' })
+      expect(o).toMatchObject({ total_inr: 1398, payment_status: 'unchecked' })
       expect(o.items.map((i) => [i.size, i.status])).toEqual([['M', 'ordered'], ['XXS', 'ordered']])
     })
     it('another student sees none of it, but does see their own older (imported) orders', async () => {
