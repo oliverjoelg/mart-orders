@@ -193,6 +193,12 @@ export function createSupabaseApi(): Api {
       check(await sb.from('payments').delete().eq('id', id))
     },
 
+    async screenshotLink(path) {
+      const { data, error } = await sb.storage.from('payment-screenshots').createSignedUrl(path, 600)
+      if (error) throw error
+      return data.signedUrl
+    },
+
     async txnElsewhere(txnIds, campaignId) {
       const out: { txn_id: string; campaign_id: string }[] = []
       for (let i = 0; i < txnIds.length; i += 100) {

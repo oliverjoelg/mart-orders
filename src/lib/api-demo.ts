@@ -486,6 +486,11 @@ export function createDemoApi(): Api {
       db.payments.splice(i, 1)
     },
 
+    async screenshotLink() {
+      await delay(60)
+      return 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="120"><text x="20" y="64">Demo screenshot</text></svg>')
+    },
+
     async txnElsewhere(txnIds, campaignId) {
       await delay(60)
       const set = new Set(txnIds)

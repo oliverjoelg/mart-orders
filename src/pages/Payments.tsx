@@ -519,12 +519,40 @@ function Txn({ p, issues, elsewhere }: { p: Payment; issues: string[]; elsewhere
       )}
       {issues.includes('twice') && <span className="badge badge-red" title="Another payment in this round gives the same transaction ID">Twice</span>}
       {elsewhere && <span className="badge badge-red" title={`Also given in: ${elsewhere.join(', ')}`}>Used before</span>}
+      {p.screenshot_path && <ScreenshotLink path={p.screenshot_path} />}
       {p.screenshot_url && (
         <a href={p.screenshot_url} target="_blank" rel="noreferrer" className="hint row" style={{ gap: 3 }} title="Open the payment screenshot the student uploaded">
           <ExternalLink size={12} /> Screenshot
         </a>
       )}
     </div>
+  )
+}
+
+/** Screenshots from the order form live in private Storage: fetch a 10-minute link on tap. */
+function ScreenshotLink({ path }: { path: string }) {
+  const { api } = useAuth()
+  const toast = useToast()
+  return (
+    <button
+      type="button"
+      className="hint row link-button"
+      style={{ gap: 3, background: 'none', border: 0, padding: 0, cursor: 'pointer' }}
+      title="Open the payment screenshot the student uploaded on the order form"
+      onClick={async () => {
+        const w = window.open('', '_blank')
+        try {
+          const url = await api.screenshotLink(path)
+          if (w) w.location.href = url
+          else window.location.href = url
+        } catch (e) {
+          w?.close()
+          toast.err(friendlyError(e))
+        }
+      }}
+    >
+      <ExternalLink size={12} /> Screenshot
+    </button>
   )
 }
 

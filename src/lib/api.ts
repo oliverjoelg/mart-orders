@@ -107,6 +107,8 @@ export interface Api {
   addPayment(p: { campaign_id: string; buyer_id: string; paid_to: string | null; amount_paid: number | null; txn_id: string | null; note: string | null; status: PaymentStatus }): Promise<Payment>
   /** super admin only */
   deletePayment(id: string): Promise<void>
+  /** A short-lived link to a screenshot uploaded on the order form (needs "Check payments"). */
+  screenshotLink(path: string): Promise<string>
   /** Payments in OTHER rounds using any of these transaction IDs (an old screenshot reused). */
   txnElsewhere(txnIds: string[], campaignId: string): Promise<{ txn_id: string; campaign_id: string }[]>
   /** Returns the saved note so the screen can show it without reloading. */

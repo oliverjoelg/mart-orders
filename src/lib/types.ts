@@ -109,6 +109,8 @@ export interface Payment {
   amount_paid: number | null
   txn_id: string | null
   screenshot_url: string | null
+  /** screenshot uploaded on the order form (Storage bucket payment-screenshots) */
+  screenshot_path?: string | null
   status: PaymentStatus
   note: string | null
   checked_by: string | null

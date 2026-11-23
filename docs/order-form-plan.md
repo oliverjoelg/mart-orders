@@ -38,10 +38,12 @@ Second goal: a much better ordering experience (3D shirt, live name preview).
 6. **Tests** in `supabase/tests/db.test.ts` (PGlite): signed-in student gets zero rows from every
    MART table, every MART write/role/member change refused, a student sees only their own orders.
 
-## Open decisions (Claude's suggestions, Oliver to confirm)
-- Students can edit/cancel an order until admins mark the round as sent to the vendor.
+## Decisions (confirmed by Oliver 2026-11-23)
+- Students **cannot** edit or cancel an order.
 - Form admins: a separate list of 1–2 people in the database (not MART super admins).
 - Cap of 6 items per order.
+
+Database side built 2026-11-23 (see `docs/decisions.md`, "Order form database").
 
 ## Form content (from the current Google Form "MART Team Batch T-Shirt")
 - Student: email (from Google), name, phone, roll number, batch (PG'24/25/26), course (PGDM,

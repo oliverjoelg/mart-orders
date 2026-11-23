@@ -25,6 +25,21 @@ const SUPABASE_STUB = `
     select nullif(auth.jwt() ->> 'sub', '')::uuid
   $$;
   grant execute on all functions in schema auth to anon, authenticated;
+
+  -- Supabase Storage, just the parts the policies use
+  create schema storage;
+  grant usage on schema storage to anon, authenticated;
+  create table storage.buckets (id text primary key, name text, public boolean default false,
+                                file_size_limit bigint, allowed_mime_types text[]);
+  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets,
+                                name text not null, owner uuid default auth.uid(), unique (bucket_id, name));
+  create function storage.foldername(name text) returns text[] language sql immutable as $$
+    select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1]
+  $$;
+  alter table storage.objects enable row level security;
+  grant select, insert, update, delete on storage.objects to authenticated;
+  grant select on storage.buckets to authenticated;
+  grant execute on all functions in schema storage to anon, authenticated;
 `
 
 const USERS = {
@@ -32,6 +47,10 @@ const USERS = {
   admin: { sub: '00000000-0000-0000-0000-000000000002', email: 'admin@mdi.ac.in', role: 'admin' },
   ops: { sub: '00000000-0000-0000-0000-000000000003', email: 'ops@mdi.ac.in', role: 'ops' },
   stranger: { sub: '00000000-0000-0000-0000-000000000009', email: 'someone@mdi.ac.in', role: null },
+  // order form: students and a form admin are not MART members
+  student: { sub: '00000000-0000-0000-0000-000000000010', email: 'student@mdi.ac.in', role: null },
+  student2: { sub: '00000000-0000-0000-0000-000000000011', email: 'student2@mdi.ac.in', role: null },
+  formadmin: { sub: '00000000-0000-0000-0000-000000000012', email: 'formadmin@mdi.ac.in', role: null },
 } as const
 type Who = keyof typeof USERS
 
@@ -40,10 +59,17 @@ let db: PGlite
 /** Run SQL as a signed-in user (role authenticated + JWT claims), like PostgREST does. */
 async function as<T = Record<string, unknown>>(who: Who, sql: string, params: unknown[] = []) {
   const u = USERS[who]
+  return asClaims<T>(
+    { sub: u.sub, email: u.email, role: 'authenticated', app_metadata: { provider: 'google', providers: ['google'] } },
+    sql,
+    params,
+  )
+}
+
+/** Run SQL with exactly these JWT claims. */
+async function asClaims<T = Record<string, unknown>>(claims: object, sql: string, params: unknown[] = []) {
   return db.transaction(async (tx) => {
-    await tx.query(`select set_config('request.jwt.claims', $1, true)`, [
-      JSON.stringify({ sub: u.sub, email: u.email, role: 'authenticated' }),
-    ])
+    await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify(claims)])
     await tx.exec('set local role authenticated')
     const res = await tx.query<T>(sql, params)
     return res
@@ -122,9 +148,14 @@ describe('migrations', () => {
 })
 
 describe('sign-in gate', () => {
-  it('refuses to create an auth user who is not on the team list', async () => {
+  it('refuses to create an auth user who is not @mdi.ac.in and not on the team list', async () => {
     const msg = await fails(db.query(`insert into auth.users (email) values ('random@gmail.com')`))
-    expect(msg).toMatch(/not on the MART team list/)
+    expect(msg).toMatch(/Only @mdi.ac.in Google accounts/)
+  })
+  it('lets any @mdi.ac.in account sign up (students, for the order form) without making them members', async () => {
+    await db.query(`insert into auth.users (email) values ('Fresh.Student@mdi.ac.in')`)
+    const r = await db.query<{ n: number }>(`select count(*)::int as n from public.members where email = 'fresh.student@mdi.ac.in'`)
+    expect(r.rows[0].n).toBe(0)
   })
   it('lets a team member sign up and links their member row', async () => {
     await db.query(`insert into auth.users (email) values ('OPS@mdi.ac.in')`)
@@ -586,5 +617,246 @@ describe('locked sales rounds', () => {
     await as('main', `update public.campaigns set locked = false where id = $1`, [lockedCampaign])
     const c = await as<{ n: number }>('ops', `select count(*)::int as n from public.campaigns where id = $1`, [lockedCampaign])
     expect(c.rows[0].n).toBe(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Order form (docs/order-form-plan.md): students sign in, order through RPCs only,
+// get nothing from MART tables and see only their own orders.
+describe('order form', () => {
+  const STUDENT_SHOT = `${USERS.student.sub}/pay-1.jpg`
+  let pinkId: string
+  let qrId: string
+  const details = { name: 'Asha Rao', phone: '+91 98765 43210', roll_no: 'pgp26-500', batch: "PG'26", course: 'PGDM', section: 'B' }
+  const item = (over: object = {}) => ({ product_id: productId, size: 'M', print_name: 'Asha', print_batch: "PG'26", ...over })
+  const submit = (who: Who, items: unknown[], pay: object = {}, det: object = details) =>
+    as<{ submit_order: { items: number; total_inr: number; order_id: string } }>(
+      who,
+      `select public.submit_order($1, $2::jsonb, $3::jsonb, $4::jsonb)`,
+      [campaignId, JSON.stringify(det), JSON.stringify(items), JSON.stringify({ qr_id: qrId, txn_id: '412345678901', screenshot_path: STUDENT_SHOT, ...pay })],
+    )
+
+  // every MART table plus the form tables: a student must get nothing from any of them
+  const TABLES = [
+    'members', 'campaigns', 'products', 'buyers', 'imports', 'order_items', 'handovers', 'notes',
+    'spare_stock', 'audit_log', 'roles', 'permissions', 'role_permissions', 'payments',
+    'form_orders', 'form_admins', 'form_rounds', 'form_products', 'form_payment_qrs',
+  ]
+
+  beforeAll(async () => {
+    const pink = await db.query<{ id: string }>(`select id from public.products where name = 'Classic MDI Baby Pink'`)
+    pinkId = pink.rows[0].id
+    // the super admin adds the form admin (a student account, not a MART member)
+    await as('main', `insert into public.form_admins (email) values ('formadmin@mdi.ac.in')`)
+  })
+
+  describe('form admins', () => {
+    it('only a MART super admin can add form admins, and at most 2', async () => {
+      expect(await fails(as('admin', `insert into public.form_admins (email) values ('x@mdi.ac.in')`))).toMatch(/row-level security/)
+      expect(await fails(as('formadmin', `insert into public.form_admins (email) values ('x@mdi.ac.in')`))).toMatch(/row-level security/)
+      await as('main', `insert into public.form_admins (email) values ('second@mdi.ac.in')`)
+      expect(await fails(as('main', `insert into public.form_admins (email) values ('third@mdi.ac.in')`))).toMatch(/at most 2/)
+      await as('main', `delete from public.form_admins where email = 'second@mdi.ac.in'`)
+    })
+    it('a form admin opens the round, sets products and a live QR', async () => {
+      await as('formadmin', `select public.form_admin_set_open($1, true)`, [campaignId])
+      await as('formadmin', `select public.form_admin_save_product($1, $2::jsonb)`, [productId, JSON.stringify({ shown: true, allow_custom_size: true, description: 'Classic' })])
+      await as('formadmin', `select public.form_admin_save_product($1, $2::jsonb)`, [pinkId, JSON.stringify({ shown: true, price_inr: 700 })])
+      const q = await as<{ id: string }>('formadmin', `insert into public.form_payment_qrs (payee_name, image_path) values ('Animesh', 'qr/animesh.png') returning id`)
+      qrId = q.rows[0].id
+      await as('formadmin', `select public.form_admin_set_active_qr($1)`, [qrId])
+      const p = await db.query<{ price_inr: number }>(`select price_inr from public.products where id = $1`, [pinkId])
+      expect(p.rows[0].price_inr).toBe(700)
+      // the price change is in the MART activity log, by the form admin
+      const a = await db.query<{ actor_email: string }>(`select actor_email from public.audit_log where table_name = 'products' and row_id = $1 order by id desc limit 1`, [pinkId])
+      expect(a.rows[0].actor_email).toBe('formadmin@mdi.ac.in')
+    })
+    it('students and MART admins cannot use form admin functions', async () => {
+      for (const w of ['student', 'admin'] as const) {
+        expect(await fails(as(w, `select public.form_admin_set_open($1, false)`, [campaignId]))).toMatch(/Only form admins/)
+        expect(await fails(as(w, `select public.form_admin_state()`))).toMatch(/Only form admins/)
+      }
+      expect(await fails(as('student', `insert into public.form_payment_qrs (payee_name, image_path) values ('Me', 'x.png')`))).toMatch(/row-level security/)
+    })
+  })
+
+  describe('a student orders', () => {
+    it('reads the open round, shown products and live QR', async () => {
+      const r = await as<{ get_order_form: { round: { item_cap: number }; products: { id: string }[]; qr: { id: string } } }>('student', `select public.get_order_form()`)
+      const f = r.rows[0].get_order_form
+      expect(f.round.item_cap).toBe(6)
+      expect(f.products.map((p) => p.id).sort()).toEqual([productId, pinkId].sort())
+      expect(f.qr.id).toBe(qrId)
+    })
+    it('uploads a screenshot only into their own folder', async () => {
+      await as('student', `insert into storage.objects (bucket_id, name) values ('payment-screenshots', $1)`, [STUDENT_SHOT])
+      expect(await fails(as('student', `insert into storage.objects (bucket_id, name) values ('payment-screenshots', $1)`, [`${USERS.student2.sub}/x.jpg`]))).toMatch(/row-level security/)
+      expect(await fails(as('student', `insert into storage.objects (bucket_id, name) values ('form-assets', 'qr/fake.png')`))).toMatch(/row-level security/)
+    })
+    it('refuses bad orders', async () => {
+      const seven = Array.from({ length: 7 }, () => item())
+      expect(await fails(submit('student', seven))).toMatch(/At most 6 items/)
+      expect(await fails(submit('student', []))).toMatch(/at least one item/)
+      expect(await fails(submit('student', [item({ product_id: pinkId, size: 'XXXXL' })]))).toMatch(/pick a size/)
+      expect(await fails(submit('student', [item({ size: 'M<script>' })]))).toMatch(/pick a size/) // custom sizes: plain text only
+      expect(await fails(submit('student', [item({ product_id: pinkId, size: 'Chest 38' })]))).toMatch(/pick a size/) // no custom sizes for pink
+      expect(await fails(submit('student', [item({ print_name: 'ASHA123' })]))).toMatch(/name on the back/)
+      expect(await fails(submit('student', [item({ print_name: 'ABCDEFGHIJKLM' })]))).toMatch(/name on the back/) // 13 > 12
+      expect(await fails(submit('student', [item({ print_batch: "PG'99" })]))).toMatch(/batch to print/)
+      expect(await fails(submit('student', [item()], {}, { ...details, phone: '12345' }))).toMatch(/10-digit/)
+      expect(await fails(submit('student', [item()], {}, { ...details, section: 'Z' }))).toMatch(/section/)
+      expect(await fails(submit('student', [item()], { txn_id: '' }))).toMatch(/transaction ID/)
+      expect(await fails(submit('student', [item()], { screenshot_path: `${USERS.student.sub}/missing.jpg` }))).toMatch(/screenshot/)
+      expect(await fails(submit('student', [item()], { qr_id: '00000000-0000-0000-0000-0000000000ff' }))).toMatch(/QR/)
+      // a roll number already belonging to someone else (imported with another email)
+      expect(await fails(submit('student', [item()], {}, { ...details, roll_no: 'PGP26-001' }))).toMatch(/linked to another account/)
+      // nothing was saved by any of these
+      const n = await db.query<{ n: number }>(`select count(*)::int as n from public.form_orders`)
+      expect(n.rows[0].n).toBe(0)
+    })
+    it('refuses anyone not signed in with an @mdi.ac.in Google account', async () => {
+      const pw = { sub: USERS.student.sub, email: USERS.student.email, role: 'authenticated', app_metadata: { provider: 'email' } }
+      expect(await fails(asClaims(pw, `select public.get_order_form()`))).toMatch(/Sign in/)
+      const gmail = { sub: '00000000-0000-0000-0000-0000000000aa', email: 'x@gmail.com', role: 'authenticated', app_metadata: { provider: 'google' } }
+      expect(await fails(asClaims(gmail, `select public.get_order_form()`))).toMatch(/Sign in/)
+    })
+    it('saves buyer, one item per row and a payment in one go; the total comes from the database', async () => {
+      const r = await submit('student', [item(), item({ product_id: pinkId, size: 'xxs', print_name: null })])
+      expect(r.rows[0].submit_order).toMatchObject({ items: 2, total_inr: 699 + 700 })
+      const items = await db.query<{ size: string; print_name: string | null; batch: string; source_slot: number }>(
+        `select i.size, i.print_name, i.batch, i.source_slot from public.order_items i join public.buyers b on b.id = i.buyer_id
+          where b.roll_no = 'PGP26-500' order by i.source_slot`)
+      expect(items.rows).toEqual([
+        { size: 'M', print_name: 'ASHA', batch: "PG'26", source_slot: 1 },
+        { size: 'XXS', print_name: null, batch: "PG'26", source_slot: 2 },
+      ])
+      const b = await db.query<{ phone: string; user_id: string; email: string }>(`select phone, user_id, email from public.buyers where roll_no = 'PGP26-500'`)
+      expect(b.rows[0]).toEqual({ phone: '9876543210', user_id: USERS.student.sub, email: 'student@mdi.ac.in' })
+      const pay = await db.query<{ amount_paid: number; paid_to: string; status: string; txn_id: string }>(
+        `select amount_paid, paid_to, status, txn_id from public.payments where screenshot_path = $1`, [STUDENT_SHOT])
+      expect(pay.rows[0]).toEqual({ amount_paid: 1399, paid_to: 'Animesh', status: 'unchecked', txn_id: '412345678901' })
+    })
+    it('shows up in MART Orders straight away, with the student in the activity log', async () => {
+      const r = await as<{ n: number }>('ops', `select count(*)::int as n from public.order_items where form_order_id is not null`)
+      expect(r.rows[0].n).toBe(2)
+      const a = await as<{ n: number }>('admin', `select count(*)::int as n from public.audit_log where table_name = 'order_items' and action = 'INSERT' and actor_email = 'student@mdi.ac.in'`)
+      expect(a.rows[0].n).toBe(2)
+    })
+    it('the same transaction ID cannot be used twice', async () => {
+      expect(await fails(submit('student', [item()]))).toMatch(/already used/)
+    })
+    it('a closed round takes no orders', async () => {
+      await as('formadmin', `select public.form_admin_set_open($1, false)`, [campaignId])
+      expect(await fails(submit('student', [item()], { txn_id: 'NEWTXN123456' }))).toMatch(/closed/)
+      await as('formadmin', `select public.form_admin_set_open($1, true)`, [campaignId])
+    })
+  })
+
+  describe('a student sees only their own orders', () => {
+    it('my_orders lists the order with its items and statuses', async () => {
+      const r = await as<{ my_orders: { total_inr: number; payment_status: string; items: { status: string; size: string }[] }[] }>('student', `select public.my_orders()`)
+      expect(r.rows[0].my_orders).toHaveLength(1)
+      const o = r.rows[0].my_orders[0]
+      expect(o).toMatchObject({ total_inr: 1399, payment_status: 'unchecked' })
+      expect(o.items.map((i) => [i.size, i.status])).toEqual([['M', 'ordered'], ['XXS', 'ordered']])
+    })
+    it('another student sees none of it, but does see their own older (imported) orders', async () => {
+      const empty = await as<{ my_orders: unknown[] }>('student2', `select public.my_orders()`)
+      expect(empty.rows[0].my_orders).toEqual([])
+      // PGP26-002 was imported from the Google Form; its email is student2's
+      await db.query(`update public.buyers set email = 'student2@mdi.ac.in' where roll_no = 'PGP26-002'`)
+      const r = await as<{ my_orders: { items: { print_name: string | null }[] }[] }>('student2', `select public.my_orders()`)
+      const names = r.rows[0].my_orders.flatMap((o) => o.items.map((i) => i.print_name))
+      expect(names).toContain('TWO')
+      expect(names).not.toContain('ASHA')
+    })
+    it('get_order_form prefills only the student’s own details', async () => {
+      const a = await as<{ get_order_form: { me: { roll_no: string } | null } }>('student', `select public.get_order_form()`)
+      expect(a.rows[0].get_order_form.me?.roll_no).toBe('PGP26-500')
+      const b = await as<{ get_order_form: { me: { roll_no: string } | null } }>('student2', `select public.get_order_form()`)
+      expect(b.rows[0].get_order_form.me?.roll_no).toBe('PGP26-002')
+    })
+    it('a student cannot read another student’s screenshot; "Check payments" can', async () => {
+      const q = `select count(*)::int as n from storage.objects where bucket_id = 'payment-screenshots'`
+      expect((await as<{ n: number }>('student', q)).rows[0].n).toBe(1)
+      expect((await as<{ n: number }>('student2', q)).rows[0].n).toBe(0)
+      expect((await as<{ n: number }>('ops', q)).rows[0].n).toBe(0)
+      expect((await as<{ n: number }>('main', q)).rows[0].n).toBe(1)
+    })
+  })
+
+  describe('a signed-in student gets nothing from MART tables', () => {
+    it('reads zero rows from every table', async () => {
+      for (const t of TABLES) {
+        const r = await as<{ n: number }>('student', `select count(*)::int as n from public.${t}`)
+        expect(r.rows[0].n, t).toBe(0)
+      }
+    })
+    it('a form admin who is not a MART member reads nothing from MART tables either', async () => {
+      for (const t of TABLES.filter((x) => !x.startsWith('form_'))) {
+        const r = await as<{ n: number }>('formadmin', `select count(*)::int as n from public.${t}`)
+        expect(r.rows[0].n, t).toBe(0)
+      }
+    })
+  })
+
+  describe('a signed-in student cannot change anything in MART', () => {
+    const snapshot = async () => {
+      const out: Record<string, string> = {}
+      for (const t of TABLES) {
+        const r = await db.query<{ h: string }>(`select md5(coalesce(string_agg(x::text, '|' order by x::text), '')) as h from public.${t} x`)
+        out[t] = r.rows[0].h
+      }
+      return out
+    }
+    it('updates and deletes touch no rows; inserts are refused', async () => {
+      const before = await snapshot()
+      for (const t of TABLES) {
+        if (t !== 'audit_log' && t !== 'permissions') {
+          await as('student', `delete from public.${t}`).catch(() => undefined)
+        }
+      }
+      await as('student', `update public.order_items set status = 'received'`)
+      await as('student', `update public.members set role = 'main_admin'`)
+      await as('student', `update public.payments set status = 'received'`)
+      await as('student', `update public.buyers set name = 'X'`)
+      await as('student', `update public.campaigns set locked = true`)
+      expect(await snapshot()).toEqual(before)
+
+      const inserts = [
+        `insert into public.members (email, display_name, role) values ('student@mdi.ac.in', 'Me', 'main_admin')`,
+        `insert into public.role_permissions (role_key, permission) values ('ops', 'remove_members')`,
+        `insert into public.roles (key, name) values ('hacker', 'Hacker')`,
+        `insert into public.campaigns (name) values ('Fake round')`,
+        `insert into public.buyers (roll_no) values ('FAKE1')`,
+        `insert into public.order_items (campaign_id, buyer_id, product_id, size) values ('${campaignId}', gen_random_uuid(), '${productId}', 'M')`,
+        `insert into public.notes (buyer_id, body, created_by) values (gen_random_uuid(), 'x', auth.uid())`,
+        `insert into public.payments (campaign_id, buyer_id) values ('${campaignId}', gen_random_uuid())`,
+        `insert into public.form_rounds (campaign_id, is_open) values ('${campaignId}', true)`,
+        `insert into public.audit_log (action, table_name) values ('INSERT', 'x')`,
+      ]
+      for (const s of inserts) {
+        expect(await fails(as('student', s)), s).toMatch(/row-level security|permission denied/)
+      }
+      expect(await snapshot()).toEqual(before)
+    })
+    it('every MART function that changes data refuses a student', async () => {
+      const calls = [
+        `select public.set_items_status(array['${itemId}']::uuid[], 'received')`,
+        `select public.record_handover(array['${itemId}']::uuid[], 'self')`,
+        `select public.undo_handover('${itemId}', 'oops')`,
+        `select public.import_orders('${campaignId}', 'x.csv', 1, 0, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb)`,
+        `select public.save_import_payments('${campaignId}', null, '[]'::jsonb)`,
+      ]
+      for (const c of calls) {
+        expect(await fails(as('student', c)), c).toMatch(/Your role cannot|permission denied/)
+      }
+    })
+    it('there is no way for a student to edit or cancel an order', async () => {
+      const fns = await db.query<{ proname: string }>(
+        `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'public' and p.proname ~ '(cancel|edit|update|delete)_.*order'`)
+      expect(fns.rows).toEqual([])
+    })
   })
 })
