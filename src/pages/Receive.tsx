@@ -1,6 +1,7 @@
-import { ArrowLeft, Check, PackageOpen, Search } from 'lucide-react'
+import { ArrowLeft, Camera, Check, PackageOpen, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import ScanReceive from '../components/ScanReceive'
 import { useToast } from '../components/Toast'
 import { Empty, Modal, PageHead, swatchColour } from '../components/ui'
 import { friendlyError } from '../lib/api'
@@ -25,6 +26,7 @@ export default function Receive() {
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<string | null>(null)
+  const [scanning, setScanning] = useState(false)
 
   const waiting = useMemo(() => items.filter((i) => i.status === 'ordered' || i.status === 'sent_to_vendor'), [items])
   const product = products.find((p) => p.id === productId) ?? null
@@ -131,8 +133,21 @@ export default function Receive() {
       </button>
       <PageHead
         title={`Receive ${product.name}`}
-        sub="Tick every item that is in the box. Use the size buttons if a whole size came."
+        sub="Tick every item that is in the box. Use the size buttons if a whole size came, or scan the names with the camera."
       />
+
+      {total > 0 && (
+        <button className="btn btn-primary scan-cta" onClick={() => setScanning(true)} title="Hold each shirt's back up to the camera; it reads the name and ticks it">
+          <Camera size={18} /> Scan names with the camera
+        </button>
+      )}
+      {scanning && (
+        <ScanReceive
+          product={product}
+          waiting={waiting.filter((i) => i.product_id === product.id)}
+          onClose={() => setScanning(false)}
+        />
+      )}
 
       {done && (
         <div className="callout ok" style={{ marginBottom: 12 }}>

@@ -73,6 +73,8 @@ function rng(seed: number) {
 let idSeq = 0
 const uid = (p: string) => `${p}-${(++idSeq).toString(36).padStart(5, '0')}`
 
+// some back names are printed in other scripts (Hindi, Tamil, Kannada, Bengali), as in real orders
+const INDIC_NAMES = ['राहुल', 'प्रिया', 'अर्जुन', 'स्नेहा', 'அருண்', 'ಅನಿಲ್', 'অমিত']
 const FIRST = ['Aarav', 'Diya', 'Kabir', 'Meera', 'Rohan', 'Ananya', 'Vihaan', 'Isha', 'Arjun', 'Sara', 'Dev', 'Tara',
   'Neel', 'Zoya', 'Karan', 'Riya', 'Yash', 'Nisha', 'Aditya', 'Pooja', 'Ira', 'Varun', 'Aisha', 'Kunal']
 const LAST = ['Sharma', 'Verma', 'Iyer', 'Nair', 'Gupta', 'Mehta', 'Rao', 'Das', 'Kapoor', 'Singh', 'Bose', 'Jain',
@@ -143,7 +145,7 @@ function build(): { db: Snapshot & { payments: Payment[] }; log: AuditEntry[] } 
         buyer_id: b.id,
         product_id: product.id,
         size: product.id === 'p-pink' && r() < 0.1 ? 'XXS' : pick(sizeWeights),
-        print_name: r() < 0.3 ? null : r() < 0.5 ? first.toUpperCase() : first,
+        print_name: r() < 0.3 ? null : r() < 0.12 ? pick(INDIC_NAMES) : r() < 0.5 ? first.toUpperCase() : first,
         batch,
         status,
         status_changed_at: new Date(t0 + 40 * 86400_000 + n * 3_600_000).toISOString(),
