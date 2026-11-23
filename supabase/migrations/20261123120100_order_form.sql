@@ -88,6 +88,8 @@ create table public.form_rounds (
   sections        text[] not null default array['A', 'B', 'C', 'D', 'E', 'F', 'NA'],
   print_batches   text[] not null default array['PG''24', 'PG''25', 'PG''26'],
   name_max        integer not null default 12 check (name_max between 1 and 30),
+  -- MART team only (e.g. a members' price round): only active MART members see and order in it
+  team_only       boolean not null default false,
   updated_at      timestamptz not null default now()
 );
 create unique index form_rounds_one_open_idx on public.form_rounds (is_open) where is_open;
@@ -205,7 +207,7 @@ as $$
 declare
   v_email text := public.student_email();
   v_round public.form_rounds;
-  v_name text;
+  v_team_only_hidden boolean := false;
 begin
   if v_email is null then
     raise exception 'Sign in with your @mdi.ac.in Google account' using errcode = '42501';
@@ -214,6 +216,11 @@ begin
   select r.* into v_round
     from public.form_rounds r join public.campaigns c on c.id = r.campaign_id
    where r.is_open and not c.locked;
+  -- a MART-team-only round is invisible to everyone who is not an active MART member
+  if v_round.team_only and public.my_role() is null then
+    v_round := null;
+    v_team_only_hidden := true;
+  end if;
 
   -- prefill: the student's last details
   return jsonb_build_object(
@@ -222,7 +229,8 @@ begin
         'campaign_id', c.id, 'title', coalesce(v_round.title, c.name), 'intro', v_round.intro,
         'item_cap', v_round.item_cap, 'student_batches', v_round.student_batches,
         'courses', v_round.courses, 'sections', v_round.sections,
-        'print_batches', v_round.print_batches, 'name_max', v_round.name_max)
+        'print_batches', v_round.print_batches, 'name_max', v_round.name_max,
+        'team_only', v_round.team_only)
         from public.campaigns c where c.id = v_round.campaign_id) end,
     'products', coalesce((
       select jsonb_agg(jsonb_build_object(
@@ -242,6 +250,7 @@ begin
             order by (b.user_id = auth.uid()) desc nulls last, b.updated_at desc
             limit 1),
     'email', v_email,
+    'team_only_round_open', v_team_only_hidden,
     'is_form_admin', public.is_form_admin()
   );
 end;
@@ -293,6 +302,9 @@ begin
    where r.campaign_id = p_campaign_id and r.is_open and not c.locked;
   if v_round.campaign_id is null then
     raise exception 'Orders for this round are closed' using errcode = '22023';
+  end if;
+  if v_round.team_only and public.my_role() is null then
+    raise exception 'This round is for the MART team only' using errcode = '42501';
   end if;
 
   -- student details

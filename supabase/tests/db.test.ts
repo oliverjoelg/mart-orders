@@ -757,6 +757,26 @@ describe('order form', () => {
       expect(await fails(submit('student', [item()], { txn_id: 'NEWTXN123456' }))).toMatch(/closed/)
       await as('formadmin', `select public.form_admin_set_open($1, true)`, [campaignId])
     })
+    it('a MART-team-only round is hidden from students and refuses their orders; team members can order', async () => {
+      await as('formadmin', `update public.form_rounds set team_only = true where campaign_id = $1`, [campaignId])
+      type F = { get_order_form: { round: { team_only: boolean } | null; products: unknown[]; team_only_round_open: boolean } }
+      const s = (await as<F>('student', `select public.get_order_form()`)).rows[0].get_order_form
+      expect(s).toMatchObject({ round: null, products: [], team_only_round_open: true })
+      expect(await fails(submit('student', [item()], { txn_id: 'TEAMTXN00001' }))).toMatch(/MART team only/)
+
+      const o = (await as<F>('ops', `select public.get_order_form()`)).rows[0].get_order_form
+      expect(o.round?.team_only).toBe(true)
+      expect(o.products).toHaveLength(2)
+      const shot = `${USERS.ops.sub}/team.jpg`
+      await as('ops', `insert into storage.objects (bucket_id, name) values ('payment-screenshots', $1)`, [shot])
+      const r = await submit('ops', [item({ print_name: 'OPS' })], { txn_id: 'TEAMTXN00002', screenshot_path: shot },
+        { ...details, name: 'Ops Member', roll_no: 'PGP26-777' })
+      expect(r.rows[0].submit_order.items).toBe(1)
+
+      await as('formadmin', `update public.form_rounds set team_only = false where campaign_id = $1`, [campaignId])
+      const again = (await as<F>('student', `select public.get_order_form()`)).rows[0].get_order_form
+      expect(again.round).not.toBeNull()
+    })
   })
 
   describe('a student sees only their own orders', () => {
@@ -784,11 +804,12 @@ describe('order form', () => {
       expect(b.rows[0].get_order_form.me?.roll_no).toBe('PGP26-002')
     })
     it('a student cannot read another student’s screenshot; "Check payments" can', async () => {
-      const q = `select count(*)::int as n from storage.objects where bucket_id = 'payment-screenshots'`
-      expect((await as<{ n: number }>('student', q)).rows[0].n).toBe(1)
-      expect((await as<{ n: number }>('student2', q)).rows[0].n).toBe(0)
-      expect((await as<{ n: number }>('ops', q)).rows[0].n).toBe(0)
-      expect((await as<{ n: number }>('main', q)).rows[0].n).toBe(1)
+      const q = `select coalesce(array_agg(name order by name), '{}') as names from storage.objects where bucket_id = 'payment-screenshots'`
+      const seen = async (w: Who) => (await as<{ names: string[] }>(w, q)).rows[0].names
+      expect(await seen('student')).toEqual([STUDENT_SHOT])
+      expect(await seen('student2')).toEqual([])
+      expect(await seen('ops')).toEqual([`${USERS.ops.sub}/team.jpg`]) // only their own (from the team-only round)
+      expect((await seen('main')).length).toBe(2) // super admin has "Check payments"
     })
   })
 
