@@ -14,25 +14,15 @@
 
 -- ---------------------------------------------------------------------------
 -- 1. who is calling
--- The signed-in user's email, only for a Google sign-in (so an email/password sign-up can never
--- pose as a student). Lower-case; null if not signed in with Google.
-create or replace function public.google_email()
-returns text
-language sql stable security definer set search_path = ''
-as $$
-  select case
-    when coalesce(auth.jwt() -> 'app_metadata' ->> 'provider', '') = 'google'
-      or coalesce(auth.jwt() -> 'app_metadata' -> 'providers', '[]'::jsonb) ? 'google'
-    then nullif(lower(btrim(auth.jwt() ->> 'email')), '')
-  end;
-$$;
+-- public.signed_in_email() (20261123110000_security_fixes.sql) is the email of a Google sign-in
+-- only, so an email/password sign-up can never pose as a student or a form admin.
 
 -- a student = anyone signed in with an @mdi.ac.in Google account (team members included)
 create or replace function public.student_email()
 returns text
 language sql stable security definer set search_path = ''
 as $$
-  select e from (select public.google_email() as e) x
+  select e from (select public.signed_in_email() as e) x
    where auth.uid() is not null and public.is_mdi_email(e);
 $$;
 
@@ -62,7 +52,7 @@ create or replace function public.is_form_admin()
 returns boolean
 language sql stable security definer set search_path = ''
 as $$
-  select exists (select 1 from public.form_admins f where f.email = public.google_email());
+  select exists (select 1 from public.form_admins f where f.email = public.signed_in_email());
 $$;
 
 grant select, insert, delete on public.form_admins to authenticated;
@@ -173,6 +163,47 @@ alter table public.order_items add constraint order_items_source_slot_check chec
 alter table public.buyers add column user_id uuid unique;
 -- screenshots uploaded on the form live in Storage (bucket payment-screenshots), not at a URL
 alter table public.payments add column screenshot_path text;
+
+-- same as 20261123110000_security_fixes.sql, plus: the uploaded screenshot (screenshot_path) can't
+-- be swapped after the payment is saved, just like screenshot_url
+create or replace function public.payment_checked()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if tg_op = 'INSERT' then
+    if auth.uid() is not null then new.created_by := auth.uid(); end if;
+    if new.status = 'unchecked' then
+      new.checked_by := null;
+      new.checked_at := null;
+    else
+      new.checked_by := auth.uid();
+      new.checked_at := now();
+    end if;
+    return new;
+  end if;
+  -- UPDATE: these never change
+  if (new.campaign_id, new.buyer_id, new.source_timestamp, new.screenshot_url, new.screenshot_path, new.import_id)
+     is distinct from (old.campaign_id, old.buyer_id, old.source_timestamp, old.screenshot_url, old.screenshot_path, old.import_id) then
+    raise exception 'A payment''s student, round, form response and screenshot can''t be changed' using errcode = '42501';
+  end if;
+  new.created_by := old.created_by;
+  if new.status is distinct from old.status then
+    if new.status = 'unchecked' then
+      new.checked_by := null;
+      new.checked_at := null;
+    else
+      new.checked_by := auth.uid();
+      new.checked_at := now();
+    end if;
+  else
+    new.checked_by := old.checked_by;
+    new.checked_at := old.checked_at;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.payment_checked() from public, anon, authenticated;
 
 create table public.form_orders (
   id            uuid primary key default gen_random_uuid(),
@@ -579,14 +610,14 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- 9. who may call what
-revoke all on function public.google_email(), public.student_email(), public.is_form_admin(),
+revoke all on function public.student_email(), public.is_form_admin(),
   public.form_admins_max_two(), public.form_qr_times(),
   public.get_order_form(), public.submit_order(uuid, jsonb, jsonb, jsonb), public.my_orders(),
   public.form_admin_state(), public.form_admin_set_open(uuid, boolean),
   public.form_admin_save_product(uuid, jsonb), public.form_admin_set_active_qr(uuid)
   from public, anon;
 revoke all on function public.form_admins_max_two(), public.form_qr_times() from authenticated;
-grant execute on function public.google_email(), public.student_email(), public.is_form_admin(),
+grant execute on function public.student_email(), public.is_form_admin(),
   public.get_order_form(), public.submit_order(uuid, jsonb, jsonb, jsonb), public.my_orders(),
   public.form_admin_state(), public.form_admin_set_open(uuid, boolean),
   public.form_admin_save_product(uuid, jsonb), public.form_admin_set_active_qr(uuid)

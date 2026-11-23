@@ -76,6 +76,10 @@ export default function Import() {
       toast.err('Choose a CSV or Excel file (.csv, .xlsx, .xls or .ods).')
       return
     }
+    if (file.size > 15 * 1024 * 1024) {
+      toast.err('That file is over 15 MB. Download just the responses sheet and try again.')
+      return
+    }
     try {
       const all = await readSpreadsheet(file)
       if (all.length === 0) {

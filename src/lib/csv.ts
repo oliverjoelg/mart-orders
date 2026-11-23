@@ -1,8 +1,15 @@
 import Papa from 'papaparse'
 
-/** Downloads rows as a CSV that Excel opens with the right encoding. Built in the browser; nothing is uploaded. */
+/**
+ * Downloads rows as a CSV that Excel opens with the right encoding. Built in the browser; nothing is uploaded.
+ * Cells starting with = + - @ get a leading ' so a student-typed "name" can't run as an Excel formula.
+ */
+export function toCsv(rows: (string | number | null)[][]): string {
+  return '﻿' + Papa.unparse(rows, { escapeFormulae: true })
+}
+
 export function downloadCsv(fileName: string, rows: (string | number | null)[][]) {
-  const csv = '﻿' + Papa.unparse(rows)
+  const csv = toCsv(rows)
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

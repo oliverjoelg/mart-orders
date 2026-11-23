@@ -18,6 +18,7 @@ const SUPABASE_STUB = `
   grant usage on schema auth to anon, authenticated;
   grant usage on schema public to anon, authenticated;
   create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb);
+  create table auth.identities (id uuid primary key default gen_random_uuid(), user_id uuid, provider text, identity_data jsonb);
   create function auth.jwt() returns jsonb language sql stable as $$
     select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb
   $$;
@@ -253,14 +254,15 @@ describe('names come from Google', () => {
     const r = await db.query<{ display_name: string }>(`select display_name from public.members where email = 'name.test@mdi.ac.in'`)
     expect(r.rows[0].display_name).toBe('Real Google Name')
   })
-  it('each sign-in refreshes the name from the token', async () => {
+  it('each sign-in refreshes the name from the Google identity', async () => {
+    await db.query(`insert into auth.identities (user_id, provider, identity_data) values ($1, 'google', '{"full_name":"Ops From Google"}')`, [USERS.ops.sub])
     await db.transaction(async (tx) => {
       await tx.query(`select set_config('request.jwt.claims', $1, true)`, [
         JSON.stringify({
           sub: USERS.ops.sub,
           email: USERS.ops.email,
           role: 'authenticated',
-          user_metadata: { full_name: 'Ops From Google' },
+          app_metadata: { provider: 'google' },
         }),
       ])
       await tx.exec('set local role authenticated')
@@ -270,6 +272,7 @@ describe('names come from Google', () => {
     expect(r.rows[0].display_name).toBe('Ops From Google')
     // put the short name back for the audit-log tests below
     await db.query(`update public.members set display_name = 'ops' where email = 'ops@mdi.ac.in'`)
+    await db.query(`delete from auth.identities where user_id = $1`, [USERS.ops.sub])
   })
   it('the activity log uses the nickname when one is set', async () => {
     await as('main', `update public.members set nickname = 'Opsy' where email = 'ops@mdi.ac.in'`)
@@ -459,7 +462,7 @@ describe('backup super admins (non-MDI)', () => {
     await db.query(`insert into auth.users (email) values ($1)`, [BACKUP])
     const r = await db.transaction(async (tx) => {
       await tx.query(`select set_config('request.jwt.claims', $1, true)`, [
-        JSON.stringify({ sub: '00000000-0000-0000-0000-0000000000bb', email: BACKUP, role: 'authenticated' }),
+        JSON.stringify({ sub: '00000000-0000-0000-0000-0000000000bb', email: BACKUP, role: 'authenticated', app_metadata: { provider: 'google' } }),
       ])
       await tx.exec('set local role authenticated')
       return tx.query<{ ok: boolean }>(`select public.is_super() as ok`)
@@ -481,7 +484,7 @@ describe('roles & permissions (configurable)', () => {
       (
         await db.transaction(async (tx) => {
           await tx.query(`select set_config('request.jwt.claims', $1, true)`, [
-            JSON.stringify({ sub: '00000000-0000-0000-0000-0000000000aa', email: 'vol@mdi.ac.in', role: 'authenticated' }),
+            JSON.stringify({ sub: '00000000-0000-0000-0000-0000000000aa', email: 'vol@mdi.ac.in', role: 'authenticated', app_metadata: { provider: 'google' } }),
           ])
           await tx.exec('set local role authenticated')
           return tx.query<{ ok: boolean }>(`select public.has_perm($1) as ok`, [p])
@@ -572,6 +575,87 @@ describe('payments', () => {
     await as('main', `delete from public.payments where campaign_id = $1 and amount_paid = 10`, [campaignId])
     expect(await count('main')).toBe(1)
     await as('main', `delete from public.role_permissions where role_key = 'admin' and permission in ('page_payments', 'check_payments')`)
+  })
+})
+
+describe('security review fixes (2026-11-23)', () => {
+  const asProvider = (email: string, provider: string, sql: string) =>
+    db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claims', $1, true)`, [
+        JSON.stringify({ sub: '00000000-0000-0000-0000-0000000000cc', email, role: 'authenticated', app_metadata: { provider } }),
+      ])
+      await tx.exec('set local role authenticated')
+      return tx.query<{ r: string | null }>(sql)
+    })
+
+  it('only a Google sign-in is recognised as a team member', async () => {
+    expect((await asProvider('admin@mdi.ac.in', 'google', `select public.my_role() as r`)).rows[0].r).toBe('admin')
+    expect((await asProvider('admin@mdi.ac.in', 'email', `select public.my_role() as r`)).rows[0].r).toBeNull()
+    expect((await asProvider('ADMIN@mdi.ac.in', 'google', `select public.my_role() as r`)).rows[0].r).toBe('admin')
+  })
+
+  it('a role that can only add orders cannot create an already-received payment', async () => {
+    const msg = await fails(
+      as('admin', `insert into public.payments (campaign_id, buyer_id, amount_paid, status)
+                   select $1, id, 1, 'received' from public.buyers where roll_no = 'PGP26-002'`, [campaignId]),
+    )
+    expect(msg).toMatch(/row-level security/)
+  })
+
+  it('who checked a payment, and who created it, cannot be faked', async () => {
+    await as('main', `insert into public.role_permissions (role_key, permission) values ('admin', 'page_payments'), ('admin', 'check_payments')`)
+    await as('admin', `insert into public.payments (campaign_id, buyer_id, amount_paid, status, created_by, checked_by)
+                       select $1, id, 7, 'received', $2, $2 from public.buyers where roll_no = 'PGP26-002'`, [campaignId, USERS.main.sub])
+    let r = await db.query<{ id: string; created_by: string; checked_by: string }>(
+      `select id, created_by, checked_by from public.payments where amount_paid = 7`)
+    expect(r.rows[0]).toMatchObject({ created_by: USERS.admin.sub, checked_by: USERS.admin.sub })
+    // editing the note can't rewrite who checked it
+    await as('admin', `update public.payments set note = 'x', checked_by = $1, checked_at = '2020-01-01' where amount_paid = 7`, [USERS.main.sub])
+    r = await db.query(`select id, created_by, checked_by from public.payments where amount_paid = 7`)
+    expect(r.rows[0].checked_by).toBe(USERS.admin.sub)
+    // and the payment can't be moved to another student
+    const moved = await fails(as('admin', `update public.payments set buyer_id = (select id from public.buyers where roll_no = 'PGP26-001') where amount_paid = 7`))
+    expect(moved).toMatch(/can't be changed/)
+    await as('main', `delete from public.payments where amount_paid = 7`)
+    await as('main', `delete from public.role_permissions where role_key = 'admin' and permission in ('page_payments', 'check_payments')`)
+  })
+
+  it('a round with payments cannot be deleted', async () => {
+    const c = await db.query<{ id: string }>(`insert into public.campaigns (name) values ('Pay-only round') returning id`)
+    await db.query(`insert into public.payments (campaign_id, buyer_id, amount_paid) select $1, id, 5 from public.buyers where roll_no = 'PGP26-002'`, [c.rows[0].id])
+    const msg = await fails(db.query(`delete from public.campaigns where id = $1`, [c.rows[0].id]))
+    expect(msg).toMatch(/foreign key/)
+    await db.query(`delete from public.payments where campaign_id = $1`, [c.rows[0].id])
+    await db.query(`delete from public.campaigns where id = $1`, [c.rows[0].id])
+  })
+
+  it('switching a member off needs "Remove team members"', async () => {
+    await as('main', `insert into public.members (email, display_name, role) values ('off.test@mdi.ac.in', 'Off', 'ops')`)
+    const msg = await fails(as('admin', `update public.members set active = false where email = 'off.test@mdi.ac.in'`))
+    expect(msg).toMatch(/can't switch team members off/)
+    await as('main', `update public.members set active = false where email = 'off.test@mdi.ac.in'`)
+    await as('main', `delete from public.members where email = 'off.test@mdi.ac.in'`)
+  })
+
+  it('only a super admin can create a round that starts locked', async () => {
+    const msg = await fails(as('admin', `insert into public.campaigns (name, locked) values ('Sneaky locked', true)`))
+    expect(msg).toMatch(/super admin/)
+  })
+
+  it('names in the log come from the Google identity, not editable profile data', async () => {
+    await db.query(`insert into auth.identities (user_id, provider, identity_data) values ($1, 'google', '{"full_name":"Real Ops"}')`, [USERS.ops.sub])
+    await db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claims', $1, true)`, [
+        JSON.stringify({ sub: USERS.ops.sub, email: USERS.ops.email, role: 'authenticated', app_metadata: { provider: 'google' },
+                         user_metadata: { full_name: 'Oliver Joel' } }),
+      ])
+      await tx.exec('set local role authenticated')
+      await tx.query(`select public.link_my_member()`)
+    })
+    const r = await db.query<{ display_name: string }>(`select display_name from public.members where email = 'ops@mdi.ac.in'`)
+    expect(r.rows[0].display_name).toBe('Real Ops')
+    await db.query(`update public.members set display_name = 'ops' where email = 'ops@mdi.ac.in'`)
+    await db.query(`delete from auth.identities where user_id = $1`, [USERS.ops.sub])
   })
 })
 
@@ -748,6 +832,10 @@ describe('order form', () => {
       expect(r.rows[0].n).toBe(2)
       const a = await as<{ n: number }>('admin', `select count(*)::int as n from public.audit_log where table_name = 'order_items' and action = 'INSERT' and actor_email = 'student@mdi.ac.in'`)
       expect(a.rows[0].n).toBe(2)
+    })
+    it("the uploaded screenshot can't be swapped afterwards, even by a super admin", async () => {
+      const msg = await fails(as('main', `update public.payments set screenshot_path = 'someone-else/x.jpg' where screenshot_path = $1`, [STUDENT_SHOT]))
+      expect(msg).toMatch(/can't be changed/)
     })
     it('the same transaction ID cannot be used twice', async () => {
       expect(await fails(submit('student', [item()]))).toMatch(/already used/)
