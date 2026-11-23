@@ -22,6 +22,16 @@ const STATUS_LABEL: Record<PaymentStatus, string> = { unchecked: 'To check', rec
 const STATUS_ORDER: Record<PaymentStatus, number> = { unchecked: 0, problem: 1, received: 2 }
 const PAGE = 150
 
+/** Form screenshots live on Google Drive; anything else is shown with its site name so nobody is fooled by a fake link. */
+const hostOf = (u: string) => {
+  try {
+    return new URL(u).hostname
+  } catch {
+    return 'unknown site'
+  }
+}
+const isGoogleHost = (u: string) => /(^|\.)(drive|docs)\.google\.com$/.test(hostOf(u))
+
 const txnKey = (t: string | null) => (t ?? '').replace(/\s+/g, '').toUpperCase()
 
 export default function Payments() {
@@ -520,8 +530,16 @@ function Txn({ p, issues, elsewhere }: { p: Payment; issues: string[]; elsewhere
       {issues.includes('twice') && <span className="badge badge-red" title="Another payment in this round gives the same transaction ID">Twice</span>}
       {elsewhere && <span className="badge badge-red" title={`Also given in: ${elsewhere.join(', ')}`}>Used before</span>}
       {p.screenshot_url && (
-        <a href={p.screenshot_url} target="_blank" rel="noreferrer" className="hint row" style={{ gap: 3 }} title="Open the payment screenshot the student uploaded">
+        <a
+          href={p.screenshot_url}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="hint row"
+          style={{ gap: 3 }}
+          title={`Open the payment screenshot the student uploaded (${hostOf(p.screenshot_url)})`}
+        >
           <ExternalLink size={12} /> Screenshot
+          {!isGoogleHost(p.screenshot_url) && <span className="badge badge-amber">{hostOf(p.screenshot_url)}: not Google Drive</span>}
         </a>
       )}
     </div>
