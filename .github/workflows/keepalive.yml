@@ -1,12 +1,25 @@
-# Free Supabase projects pause after a week without activity. This calls the tiny public
-# `ping()` function once a week so the project stays awake between T-shirt drops.
-# Uses the same public repo variables as deploy.yml.
+# Keeps the free Supabase project from pausing during quiet months (holidays, between drops).
+#
+#  1. ping: free Supabase projects pause after a week without activity
+#     (https://supabase.com/pricing). This calls the tiny public `ping()` function every Monday.
+#  2. stay-active: GitHub switches off scheduled workflows in a public repo after 60 days with no
+#     repository activity (https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/disabling-and-enabling-a-workflow),
+#     which would silently stop step 1. So if master has had no commit for 45 days, this pushes
+#     an empty "keep-alive" commit. It is marked [skip ci], so the site is not rebuilt.
+#
+# Uses the same public repo variables as deploy.yml. If a run fails, GitHub emails whoever
+# last edited this file.
 name: Keep Supabase awake
 
 on:
   schedule:
     - cron: '17 3 * * 1' # Mondays 03:17 UTC
   workflow_dispatch:
+    inputs:
+      force_commit:
+        description: 'Push the keep-alive commit now, even if master is recent (to test it)'
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -20,5 +33,31 @@ jobs:
           KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
         run: |
           test -n "$URL" && test -n "$KEY" || { echo "Set the VITE_SUPABASE_* repo variables"; exit 1; }
-          curl --fail --silent --show-error -X POST "$URL/rest/v1/rpc/ping" \
+          curl --fail --silent --show-error --retry 3 --retry-delay 20 -X POST "$URL/rest/v1/rpc/ping" \
             -H "apikey: $KEY" -H "Content-Type: application/json" -d '{}'
+
+  stay-active:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # only to push the empty keep-alive commit
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 1
+      - name: Push an empty commit if master has been quiet for 45 days
+        env:
+          FORCE: ${{ inputs.force_commit }}
+        run: |
+          last=$(git log -1 --format=%ct)
+          age_days=$(( ( $(date +%s) - last ) / 86400 ))
+          echo "Last commit on master: ${age_days} days ago"
+          if [ "$age_days" -lt 45 ] && [ "$FORCE" != "true" ]; then
+            echo "Recent enough; nothing to do."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "Keep scheduled jobs active [skip ci]" \
+            -m "GitHub disables scheduled workflows after 60 days without repository activity; this empty commit keeps the Supabase keep-alive running."
+          git push origin HEAD:master

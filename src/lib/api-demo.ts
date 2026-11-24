@@ -495,6 +495,28 @@ export function createDemoApi(): Api {
       return 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="120"><text x="20" y="64">Demo screenshot</text></svg>')
     },
 
+    async usageStats() {
+      await delay(150)
+      if (!isSuperRole(role)) throw new Error('Only a super admin can see usage')
+      const mb = 1024 * 1024
+      return {
+        db_bytes: Math.round(14.2 * mb),
+        public_bytes: Math.round(3.1 * mb),
+        tables: [
+          { name: 'audit_log', bytes: Math.round(1.4 * mb), rows: log.length },
+          { name: 'order_items', bytes: Math.round(0.6 * mb), rows: db.items.length },
+          { name: 'buyers', bytes: Math.round(0.3 * mb), rows: db.buyers.length },
+          { name: 'payments', bytes: Math.round(0.25 * mb), rows: db.payments.length },
+          { name: 'handovers', bytes: Math.round(0.2 * mb), rows: db.handovers.length },
+        ],
+        storage_bytes: 0,
+        storage_files: 0,
+        first_round_at: new Date(Date.now() - 80 * 86400_000).toISOString(),
+        orders: db.items.length,
+        measured_at: new Date().toISOString(),
+      }
+    },
+
     async txnElsewhere(txnIds, campaignId) {
       await delay(60)
       const set = new Set(txnIds)

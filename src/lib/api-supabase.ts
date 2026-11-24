@@ -1,5 +1,5 @@
 import type { PostgrestError } from '@supabase/supabase-js'
-import { pickCampaign, type ActivityQuery, type Api, type AuthUser, type ImportArgs, type Snapshot } from './api'
+import { pickCampaign, type ActivityQuery, type Api, type AuthUser, type ImportArgs, type Snapshot, type UsageStats } from './api'
 import { getSupabase } from './supabase'
 import type { AuditEntry, Buyer, Handover, Member, Note, OrderItem, Payment } from './types'
 
@@ -197,6 +197,10 @@ export function createSupabaseApi(): Api {
       const { data, error } = await sb.storage.from('payment-screenshots').createSignedUrl(path, 600)
       if (error) throw error
       return data.signedUrl
+    },
+
+    async usageStats() {
+      return check(await sb.rpc('usage_stats')) as UsageStats
     },
 
     async txnElsewhere(txnIds, campaignId) {

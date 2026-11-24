@@ -15,6 +15,7 @@ export const PAGE_HINTS = {
   '/activity': 'Every change: who did it, when, and what it was before.',
   '/products': 'Sales rounds and the items sold in each.',
   '/team': 'Who can sign in, and what each role can do.',
+  '/usage': 'How much of the free Supabase plan is used, and roughly when it fills up.',
 } as const
 
 export type HintPath = keyof typeof PAGE_HINTS
