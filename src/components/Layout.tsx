@@ -6,13 +6,12 @@ import {
   History,
   LayoutDashboard,
   LogOut,
-  Moon,
   PackageCheck,
   PackageOpen,
+  Palette,
   Printer,
   Send,
   Shirt,
-  Sun,
   Tag,
   Upload,
   Users,
@@ -27,6 +26,9 @@ import { useData } from '../lib/store'
 import { PAGE_HINTS, type HintPath } from '../lib/hints'
 import { allRoles } from '../lib/permissions'
 import { memberLabel, type Role } from '../lib/types'
+import { applyTheme, decorOn, savedTheme, setDecorOn, type ThemeDef } from '../lib/themes'
+import ThemeDecor from './ThemeDecor'
+import ThemePicker from './ThemePicker'
 import { Avatar, Modal, RoleBadge } from './ui'
 
 interface NavItem {
@@ -58,26 +60,20 @@ export const NAV: NavItem[] = [
 // Phone bottom bar = the everyday jobs. Everything else is under More.
 const BOTTOM_CANDIDATES = ['/', '/desk', '/receive', '/exports', '/items', '/inventory', '/print', '/activity']
 
-type Theme = 'dark' | 'light'
-
-function useTheme(): [Theme, () => void] {
-  const [theme, setTheme] = useState<Theme>(() => {
-    try {
-      return (localStorage.getItem('mart-theme') as Theme | null) ?? 'dark'
-    } catch {
-      return 'dark'
-    }
-  })
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0f0f0f' : '#fbfbfb')
-    try {
-      localStorage.setItem('mart-theme', theme)
-    } catch {
-      /* private mode */
-    }
-  }, [theme])
-  return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))]
+/** The theme picked on this device (fun themes live in lib/themes.ts). */
+function useTheme() {
+  const [theme, setTheme] = useState<ThemeDef>(() => savedTheme())
+  const [decor, setDecor] = useState<boolean>(() => decorOn())
+  useEffect(() => applyTheme(theme), [theme])
+  return {
+    theme,
+    decor,
+    pick: setTheme,
+    setDecor: (on: boolean) => {
+      setDecorOn(on)
+      setDecor(on)
+    },
+  }
 }
 
 function BrandMark({ size = 16 }: { size?: number }) {
@@ -145,8 +141,9 @@ function DemoBanner() {
 export function Layout({ children }: { children: ReactNode }) {
   const { member, signOut } = useAuth()
   const { campaign } = useData()
-  const [theme, toggleTheme] = useTheme()
+  const { theme, decor, pick, setDecor } = useTheme()
   const [more, setMore] = useState(false)
+  const [picking, setPicking] = useState(false)
   const location = useLocation()
   const role = member?.role
   const items = NAV.filter((n) => !n.need || can(role, n.need))
@@ -203,8 +200,8 @@ export function Layout({ children }: { children: ReactNode }) {
           <div className="row between">
             {member && <RoleBadge role={member.role} />}
             <div className="row" style={{ gap: 2 }}>
-              <button className="btn btn-ghost btn-icon btn-sm" onClick={toggleTheme} aria-label="Switch theme" title="Switch theme">
-                {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+              <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setPicking(true)} aria-label="Change theme" title={`Theme: ${theme.name}. Click to change`}>
+                <Palette size={15} />
               </button>
               <button className="btn btn-ghost btn-icon btn-sm" onClick={() => void signOut()} aria-label="Sign out" title="Sign out">
                 <LogOut size={15} />
@@ -250,6 +247,17 @@ export function Layout({ children }: { children: ReactNode }) {
         </button>
       </nav>
 
+      <ThemeDecor decor={decor ? theme.decor : null} />
+      {picking && (
+        <ThemePicker
+          current={theme}
+          decor={decor}
+          onPick={pick}
+          onDecor={setDecor}
+          onClose={() => setPicking(false)}
+        />
+      )}
+
       {more && (
         <Modal title="More" onClose={() => setMore(false)}>
           <div className="stack-sm">
@@ -278,9 +286,15 @@ export function Layout({ children }: { children: ReactNode }) {
               </div>
             )}
             <div className="row">
-              <button className="btn" style={{ flex: 1 }} onClick={toggleTheme}>
-                {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-                {theme === 'dark' ? 'Light theme' : 'Dark theme'}
+              <button
+                className="btn"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  setMore(false)
+                  setPicking(true)
+                }}
+              >
+                <Palette size={15} /> Theme: {theme.emoji} {theme.name}
               </button>
               <button className="btn" style={{ flex: 1 }} onClick={() => void signOut()}>
                 <LogOut size={15} /> Sign out

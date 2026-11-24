@@ -343,7 +343,7 @@ export default function Import() {
                           <td className="right num">{r.amount_paid !== null ? inr(r.amount_paid) : '—'}</td>
                           <td className="right num">
                             {inr(r.expected_amount)}{' '}
-                            {r.amount_paid === r.expected_amount && <CheckCircle2 size={13} style={{ color: 'var(--accent)', verticalAlign: -2 }} />}
+                            {r.amount_paid === r.expected_amount && <CheckCircle2 size={13} style={{ color: 'var(--ok)', verticalAlign: -2 }} />}
                           </td>
                         </tr>
                       ))}

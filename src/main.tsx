@@ -2,13 +2,11 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import type { Api } from './lib/api'
+import { applyTheme, savedTheme } from './lib/themes'
 import './styles.css'
 
-try {
-  document.documentElement.dataset.theme = localStorage.getItem('mart-theme') ?? 'dark'
-} catch {
-  document.documentElement.dataset.theme = 'dark'
-}
+// the saved theme before the first paint, so there is no flash of the default colours
+applyTheme(savedTheme(), false)
 
 // `npm run dev:demo` runs the app on made-up data with no backend; the demo code is not
 // part of the production bundle.

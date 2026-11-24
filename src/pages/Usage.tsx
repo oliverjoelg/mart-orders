@@ -62,7 +62,7 @@ function dashboardUrl(): string | null {
 
 function Meter({ used, limit }: { used: number; limit: number }) {
   const pct = Math.min(100, (used / limit) * 100)
-  const colour = pct >= 90 ? 'var(--red)' : pct >= 75 ? 'var(--amber)' : 'var(--accent)'
+  const colour = pct >= 90 ? 'var(--red)' : pct >= 75 ? 'var(--amber)' : 'var(--ok)'
   return (
     <div className="stack-sm">
       <div className="row between" style={{ alignItems: 'baseline' }}>
