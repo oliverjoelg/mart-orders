@@ -71,6 +71,19 @@ export interface ImportPayment {
 
 export type PaymentPatch = Partial<Pick<Payment, 'status' | 'note' | 'paid_to' | 'amount_paid' | 'txn_id'>>
 
+/** Super admins: how much of the free plan is used (see public.usage_stats). */
+export interface UsageStats {
+  db_bytes: number
+  /** our own tables (orders, students, log…), the part that grows */
+  public_bytes: number
+  tables: { name: string; bytes: number; rows: number }[]
+  storage_bytes: number
+  storage_files: number
+  first_round_at: string | null
+  orders: number
+  measured_at: string
+}
+
 export interface ActivityQuery {
   limit: number
   beforeId?: number
@@ -109,6 +122,8 @@ export interface Api {
   deletePayment(id: string): Promise<void>
   /** Payments in OTHER rounds using any of these transaction IDs (an old screenshot reused). */
   txnElsewhere(txnIds: string[], campaignId: string): Promise<{ txn_id: string; campaign_id: string }[]>
+  /** super admin only */
+  usageStats(): Promise<UsageStats>
   /** Returns the saved note so the screen can show it without reloading. */
   addNote(note: { buyer_id?: string | null; item_id?: string | null; body: string; is_flag: boolean }): Promise<Note>
   setNoteResolved(id: string, resolved: boolean): Promise<Note>
