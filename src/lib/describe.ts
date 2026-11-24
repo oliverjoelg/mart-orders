@@ -103,6 +103,29 @@ export function describeEntry(e: AuditEntry, ctx: DescribeCtx): { text: string; 
       const p = ctx.productsById.get(String(n.product_id ?? o.product_id))
       return { text: `set spare ${p?.colour ?? ''} ${str(n.size ?? o.size)} to ${str(n.quantity)}`, tone: '' }
     }
+    // order form (logged since 20261124120000_order_form_security.sql)
+    case 'form_orders': {
+      const roll = ctx.buyersById.get(String(n.buyer_id ?? o.buyer_id))?.roll_no ?? 'a student'
+      if (e.action === 'INSERT') return { text: `placed an order on the form for ${roll} (${str(n.item_count)} items, ₹${str(n.total_inr)})`, tone: 'green' }
+      return { text: `${e.action === 'DELETE' ? 'deleted' : 'changed'} a form order for ${roll}`, tone: e.action === 'DELETE' ? 'red' : '' }
+    }
+    case 'form_payment_qrs': {
+      const who = str(n.payee_name ?? o.payee_name)
+      if (e.action === 'INSERT') return { text: `added a payment QR for ${who}${n.upi_id ? ` (${str(n.upi_id)})` : ''}`, tone: 'amber' }
+      if (e.action === 'DELETE') return { text: `removed ${who}'s payment QR`, tone: 'amber' }
+      if (changed.includes('active')) return { text: n.active ? `made ${who}'s payment QR live` : `took ${who}'s payment QR down`, tone: 'amber' }
+      return { text: `edited ${who}'s payment QR (${changed.join(', ')})`, tone: 'amber' }
+    }
+    case 'form_admins':
+      return { text: `${e.action === 'DELETE' ? 'removed' : 'added'} form admin ${str(n.email ?? o.email)}`, tone: 'amber' }
+    case 'form_rounds':
+      if (e.action === 'UPDATE' && changed.includes('is_open')) return { text: n.is_open ? 'opened the order form' : 'closed the order form', tone: 'blue' }
+      if (e.action === 'INSERT' && n.is_open) return { text: 'opened the order form', tone: 'blue' }
+      return { text: `changed order form settings${changed.length ? ` (${changed.join(', ')})` : ''}`, tone: '' }
+    case 'form_products': {
+      const p = ctx.productsById.get(String(n.product_id ?? o.product_id))
+      return { text: `changed how ${p?.name ?? 'a product'} shows on the order form`, tone: '' }
+    }
     default:
       return { text: `${e.action.toLowerCase()} on ${e.table_name}`, tone: '' }
   }

@@ -193,6 +193,12 @@ export function createSupabaseApi(): Api {
       check(await sb.from('payments').delete().eq('id', id))
     },
 
+    async screenshotLink(path) {
+      const { data, error } = await sb.storage.from('payment-screenshots').createSignedUrl(path, 600)
+      if (error) throw error
+      return data.signedUrl
+    },
+
     async usageStats() {
       return check(await sb.rpc('usage_stats')) as UsageStats
     },
@@ -254,6 +260,19 @@ export function createSupabaseApi(): Api {
     async deleteMember(id) {
       const res = await sb.from('members').delete().eq('id', id).select('id')
       if ((check(res) as unknown[]).length === 0) throw new Error('Only the super admin can remove team members.')
+    },
+
+    async listFormAdmins() {
+      return check(await sb.from('form_admins').select('email, created_at').order('created_at')) as { email: string; created_at: string }[]
+    },
+
+    async addFormAdmin(email) {
+      check(await sb.from('form_admins').insert({ email: email.trim().toLowerCase() }))
+    },
+
+    async removeFormAdmin(email) {
+      const res = await sb.from('form_admins').delete().eq('email', email).select('email')
+      if ((check(res) as unknown[]).length === 0) throw new Error('Only the super admin can remove form admins.')
     },
 
     async saveProduct(p) {

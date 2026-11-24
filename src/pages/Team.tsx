@@ -1,5 +1,5 @@
-import { Lock, Pencil, Plus, Trash2, UserPlus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ExternalLink, Lock, Pencil, Plus, Trash2, UserPlus } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useToast } from '../components/Toast'
 import { Avatar, Modal, PageHead, RoleBadge, Segmented, Switch } from '../components/ui'
 import { friendlyError } from '../lib/api'
@@ -8,7 +8,7 @@ import { allRoles, assignableRoles, can, isSuperRole, roleName } from '../lib/pe
 import { useData } from '../lib/store'
 import { memberLabel, type Member, type Role } from '../lib/types'
 
-type Tab = 'people' | 'permissions'
+type Tab = 'people' | 'permissions' | 'form'
 
 export default function Team() {
   const { member } = useAuth()
@@ -34,11 +34,12 @@ export default function Team() {
             options={[
               { value: 'people', label: 'People' },
               { value: 'permissions', label: 'Permissions' },
+              { value: 'form', label: 'Order form' },
             ]}
           />
         </div>
       )}
-      {tab === 'people' || !isSuper ? <People /> : <Permissions />}
+      {tab === 'people' || !isSuper ? <People /> : tab === 'form' ? <FormAdmins /> : <Permissions />}
     </div>
   )
 }
@@ -411,3 +412,122 @@ function Permissions() {
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------- order-form admins
+
+const FORM_SITE = 'https://oliverjoelg.github.io/mart-order-form/#/admin'
+
+/** Super admin only: the 1-2 people who run the student order form (open/close it, QR, photos).
+ *  They don't need to be on the MART team; the database allows at most 2. */
+function FormAdmins() {
+  const { api } = useAuth()
+  const toast = useToast()
+  const [list, setList] = useState<{ email: string; created_at: string }[] | null>(null)
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      setList(await api.listFormAdmins())
+    } catch (e) {
+      toast.err(friendlyError(e))
+      setList([])
+    }
+  }, [api, toast])
+  useEffect(() => void load(), [load])
+
+  const clean = email.trim().toLowerCase()
+  const valid = /^[^@\s]+@mdi\.ac\.in$/.test(clean)
+  const full = (list?.length ?? 0) >= 2
+
+  return (
+    <div className="stack">
+      <div className="card card-pad stack-sm">
+        <div style={{ fontWeight: 600 }}>Order form admins</div>
+        <div className="hint">
+          They run the student order form: open or close a round, choose which products show, add photos and descriptions,
+          and put up the live payment QR. They can't change prices, sizes or anything else in MART Orders, and they don't need
+          to be on the team. At most 2. They sign in on the form with their @mdi.ac.in Google account and open its Admin tab.
+        </div>
+        <a className="hint row" style={{ gap: 4 }} href={FORM_SITE} target="_blank" rel="noreferrer">
+          <ExternalLink size={12} /> Open the form's Admin page
+        </a>
+      </div>
+
+      {list === null ? (
+        <div className="hint">Loading…</div>
+      ) : (
+        <div className="stack-sm">
+          {list.length === 0 && <div className="hint">No form admins yet. Nobody can open the form or put up a QR until you add one.</div>}
+          {list.map((f) => (
+            <div key={f.email} className="card card-pad row between" style={{ flexWrap: 'nowrap' }}>
+              <span className="mono" style={{ overflowWrap: 'anywhere' }}>{f.email}</span>
+              <button
+                className="btn btn-sm"
+                disabled={busy}
+                onClick={async () => {
+                  if (!window.confirm(`Remove ${f.email} as an order form admin?`)) return
+                  setBusy(true)
+                  try {
+                    await api.removeFormAdmin(f.email)
+                    toast.ok('Removed')
+                    await load()
+                  } catch (e) {
+                    toast.err(friendlyError(e))
+                  } finally {
+                    setBusy(false)
+                  }
+                }}
+              >
+                <Trash2 size={13} /> Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <form
+        className="card card-pad stack-sm"
+        onSubmit={async (ev) => {
+          ev.preventDefault()
+          if (!valid || full) return
+          setBusy(true)
+          try {
+            await api.addFormAdmin(clean)
+            toast.ok(`${clean} is now an order form admin`)
+            setEmail('')
+            await load()
+          } catch (e) {
+            toast.err(friendlyError(e))
+          } finally {
+            setBusy(false)
+          }
+        }}
+      >
+        <div className="field">
+          <label htmlFor="fa-email">Add a form admin</label>
+          <input
+            id="fa-email"
+            className="input mono"
+            type="email"
+            inputMode="email"
+            autoCapitalize="none"
+            placeholder="name@mdi.ac.in"
+            value={email}
+            disabled={full}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <span className="hint">
+            {full ? 'There are already 2. Remove one first.' : clean && !valid ? 'Use their @mdi.ac.in email.' : ' '}
+          </span>
+        </div>
+        <div>
+          <button className="btn btn-primary" type="submit" disabled={!valid || full || busy}>
+            <UserPlus size={15} /> Add
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+

@@ -253,6 +253,8 @@ export function createDemoApi(): Api {
   const deny = () => {
     throw new Error("Your role isn't allowed to do that.")
   }
+  // order-form admins (super admin manages them on Roles & permissions > Order form)
+  const formAdmins: { email: string; created_at: string }[] = [{ email: 'super.admin@mdi.ac.in', created_at: '2026-11-24T09:00:00Z' }]
   const record = (
     action: AuditEntry['action'], table: string, rowId: string, itemId: string | null,
     oldData: object | null, newData: object | null,
@@ -488,6 +490,11 @@ export function createDemoApi(): Api {
       db.payments.splice(i, 1)
     },
 
+    async screenshotLink() {
+      await delay(60)
+      return 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="120"><text x="20" y="64">Demo screenshot</text></svg>')
+    },
+
     async usageStats() {
       await delay(150)
       if (!isSuperRole(role)) throw new Error('Only a super admin can see usage')
@@ -581,6 +588,31 @@ export function createDemoApi(): Api {
         db.members.push(row)
         record('INSERT', 'members', row.id, null, null, row)
       }
+    },
+
+    async listFormAdmins() {
+      await delay(80)
+      if (!isSuperRole(role)) return []
+      return clone(formAdmins)
+    },
+
+    async addFormAdmin(email) {
+      await delay()
+      if (!isSuperRole(role)) deny()
+      const e = email.trim().toLowerCase()
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error('That email looks wrong')
+      if (formAdmins.some((f) => f.email === e)) throw new Error('Already a form admin')
+      if (formAdmins.length >= 2) throw new Error('The order form has at most 2 form admins. Remove one first.')
+      formAdmins.push({ email: e, created_at: new Date().toISOString() })
+      record('INSERT', 'form_admins', e, null, null, { email: e })
+    },
+
+    async removeFormAdmin(email) {
+      await delay()
+      if (!isSuperRole(role)) deny()
+      const i = formAdmins.findIndex((f) => f.email === email)
+      if (i >= 0) formAdmins.splice(i, 1)
+      record('DELETE', 'form_admins', email, null, { email }, null)
     },
 
     async deleteMember(id) {

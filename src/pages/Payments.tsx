@@ -190,7 +190,7 @@ export default function Payments() {
           b?.roll_no ?? '', b?.name ?? '', p.paid_to ?? '', String(p.amount_paid ?? ''), String(calc.cost.get(p.buyer_id) ?? 0),
           bal === 0 ? '' : String(bal), p.txn_id ?? '', STATUS_LABEL[p.status], p.note ?? '',
           p.checked_by ? memberName(p.checked_by) : '', p.checked_at ? formatDateTime(p.checked_at) : '',
-          p.source_timestamp ? formatDateTime(p.source_timestamp) : 'added by hand', p.screenshot_url ?? '',
+          p.source_timestamp ? formatDateTime(p.source_timestamp) : 'added by hand', p.screenshot_url ?? (p.screenshot_path ? 'uploaded on the order form' : ''),
         ]
       })
     void downloadXlsx(`MART payments - ${campaign.name}.xlsx`, [
@@ -529,6 +529,7 @@ function Txn({ p, issues, elsewhere }: { p: Payment; issues: string[]; elsewhere
       )}
       {issues.includes('twice') && <span className="badge badge-red" title="Another payment in this round gives the same transaction ID">Twice</span>}
       {elsewhere && <span className="badge badge-red" title={`Also given in: ${elsewhere.join(', ')}`}>Used before</span>}
+      {p.screenshot_path && <ScreenshotLink path={p.screenshot_path} />}
       {p.screenshot_url && (
         <a
           href={p.screenshot_url}
@@ -543,6 +544,33 @@ function Txn({ p, issues, elsewhere }: { p: Payment; issues: string[]; elsewhere
         </a>
       )}
     </div>
+  )
+}
+
+/** Screenshots from the order form live in private Storage: fetch a 10-minute link on tap. */
+function ScreenshotLink({ path }: { path: string }) {
+  const { api } = useAuth()
+  const toast = useToast()
+  return (
+    <button
+      type="button"
+      className="hint row link-button"
+      style={{ gap: 3, background: 'none', border: 0, padding: 0, cursor: 'pointer' }}
+      title="Open the payment screenshot the student uploaded on the order form"
+      onClick={async () => {
+        const w = window.open('', '_blank')
+        try {
+          const url = await api.screenshotLink(path)
+          if (w) w.location.href = url
+          else window.location.href = url
+        } catch (e) {
+          w?.close()
+          toast.err(friendlyError(e))
+        }
+      }}
+    >
+      <ExternalLink size={12} /> Screenshot
+    </button>
   )
 }
 
