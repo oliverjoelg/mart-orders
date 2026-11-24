@@ -258,6 +258,19 @@ export function createSupabaseApi(): Api {
       if ((check(res) as unknown[]).length === 0) throw new Error('Only the super admin can remove team members.')
     },
 
+    async listFormAdmins() {
+      return check(await sb.from('form_admins').select('email, created_at').order('created_at')) as { email: string; created_at: string }[]
+    },
+
+    async addFormAdmin(email) {
+      check(await sb.from('form_admins').insert({ email: email.trim().toLowerCase() }))
+    },
+
+    async removeFormAdmin(email) {
+      const res = await sb.from('form_admins').delete().eq('email', email).select('email')
+      if ((check(res) as unknown[]).length === 0) throw new Error('Only the super admin can remove form admins.')
+    },
+
     async saveProduct(p) {
       const { id, ...rest } = p
       if (id) check(await sb.from('products').update(rest).eq('id', id))

@@ -120,6 +120,10 @@ export interface Api {
   saveMember(m: { id?: string; email: string; display_name: string; nickname: string | null; role: Role; active: boolean }): Promise<void>
   /** super admin only */
   deleteMember(id: string): Promise<void>
+  /** Order-form admins (the separate mart-order-form site). Super admin only; at most 2. */
+  listFormAdmins(): Promise<{ email: string; created_at: string }[]>
+  addFormAdmin(email: string): Promise<void>
+  removeFormAdmin(email: string): Promise<void>
   saveProduct(p: Partial<Product> & { campaign_id: string }): Promise<void>
   /** admins; the database refuses if any order uses the product */
   deleteProduct(id: string): Promise<void>

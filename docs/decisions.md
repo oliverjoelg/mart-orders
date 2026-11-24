@@ -68,3 +68,4 @@
   - **Logging:** `form_admins`, `form_rounds`, `form_products`, `form_payment_qrs` and `form_orders` are in the activity log; MART Orders' Activity page describes them ("made Animesh's payment QR live", "opened the order form", …).
   - **Locked rounds:** their form settings are hidden from members and frozen for form admins.
   - **Rollbacks** for each order-form migration are in `supabase/rollback/` and tested in reverse order (`supabase/tests/rollback.test.ts`).
+- **Managing form admins** (Oliver, 2026-11-24): super admins add and remove order-form admins in MART Orders → Roles & permissions → **Order form** (at most 2, @mdi.ac.in only; the database enforces both). First form admin: `pgdm26oliver_j@mdi.ac.in`, added live on 2026-11-24.
