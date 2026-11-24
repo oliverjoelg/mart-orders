@@ -1,5 +1,6 @@
 import {
   Boxes,
+  Gauge,
   Lock,
   Ellipsis,
   History,
@@ -50,6 +51,7 @@ export const NAV: NavItem[] = [
   { to: '/activity', label: 'Activity', icon: History, group: 'Data', need: 'pageActivity' },
   { to: '/products', label: 'Products', icon: Tag, group: 'Settings', need: 'pageProducts' },
   { to: '/team', label: 'Roles & permissions', short: 'Team', icon: Users, group: 'Admin', need: 'manageMembers' },
+  { to: '/usage', label: 'Usage', icon: Gauge, group: 'Admin', need: 'super' },
 ]
 
 /** phone bottom bar: the first four tabs this role can use */

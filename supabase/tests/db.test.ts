@@ -628,6 +628,26 @@ describe('security review fixes (2026-11-23)', () => {
   })
 })
 
+describe('usage page', () => {
+  it('a super admin sees database size and the biggest tables', async () => {
+    const r = await as<{ u: { db_bytes: number; public_bytes: number; tables: { name: string; bytes: number }[]; storage_bytes: number; orders: number } }>(
+      'main',
+      `select public.usage_stats() as u`,
+    )
+    const u = r.rows[0].u
+    expect(u.db_bytes).toBeGreaterThan(0)
+    expect(u.public_bytes).toBeGreaterThan(0)
+    expect(u.tables.length).toBeGreaterThan(0)
+    expect(u.tables.map((t) => t.name)).toContain('order_items')
+    expect(u.storage_bytes).toBe(0) // no Supabase Storage in the test database
+    expect(u.orders).toBeGreaterThan(0)
+  })
+  it('nobody else can call it', async () => {
+    expect(await fails(as('admin', `select public.usage_stats()`))).toMatch(/Only a super admin/)
+    expect(await fails(as('ops', `select public.usage_stats()`))).toMatch(/Only a super admin/)
+  })
+})
+
 describe('locked sales rounds', () => {
   let lockedCampaign: string
   beforeAll(async () => {

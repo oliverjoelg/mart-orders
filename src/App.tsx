@@ -22,6 +22,7 @@ import PrintList from './pages/PrintList'
 import Products from './pages/Products'
 import Receive from './pages/Receive'
 import Team from './pages/Team'
+import Usage from './pages/Usage'
 
 /** Shows a page only if the signed-in role has its tick; otherwise goes to the first page it can see. */
 function Allowed({ need, children }: { need: Action; children: ReactNode }) {
@@ -71,6 +72,7 @@ function Shell() {
             <Route path="/products" element={allow('pageProducts', <Products />)} />
             <Route path="/receive" element={allow('setStatus', <Receive />)} />
             <Route path="/team" element={allow('manageMembers', <Team />)} />
+            <Route path="/usage" element={allow('super', <Usage />)} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Gate>
