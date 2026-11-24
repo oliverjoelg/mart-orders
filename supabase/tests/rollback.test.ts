@@ -34,7 +34,7 @@ it('order-form migration rolls back and re-applies cleanly', async () => {
   await db.close()
 }, 60000)
 
-it('storage migration rolls back cleanly, then the order-form one too, and both re-apply', async () => {
+it('security, storage and order-form migrations roll back in reverse order and re-apply', async () => {
   const src = readFileSync(join(ROOT, 'supabase/tests/db.test.ts'), 'utf8')
   const stub = /const SUPABASE_STUB = `([\s\S]*?)`/.exec(src)![1]
   const db = new PGlite()
@@ -47,12 +47,24 @@ it('storage migration rolls back cleanly, then the order-form one too, and both 
     policies: (await db.query<{ n: number }>(`select count(*)::int n from pg_policies where schemaname = 'storage'`)).rows[0].n,
   })
   expect(await count()).toEqual({ buckets: 2, policies: 6 })
+  const def = async (f: string) => (await db.query<{ d: string }>(`select pg_get_functiondef('${f}'::regprocedure) d`)).rows[0].d
+  const trig = async () => (await db.query<{ n: number }>(`select count(*)::int n from pg_trigger where tgname like 'form\_%\_audit'`)).rows[0].n
+  expect(await def('public.submit_order(uuid,jsonb,jsonb,jsonb)')).toContain('submit_order:txn:')
+  expect(await trig()).toBe(5)
+  // undo the security-review migration: back to exactly what 20261123120100 defined
+  await db.exec(readFileSync(join(rb, '20261124120000_order_form_security.down.sql'), 'utf8'))
+  expect(await def('public.submit_order(uuid,jsonb,jsonb,jsonb)')).not.toContain('submit_order:txn:')
+  expect(await def('public.enforce_member_signup()')).not.toContain('raw_app_meta_data')
+  expect(await trig()).toBe(0)
+  expect(await count()).toEqual({ buckets: 2, policies: 6 })
   await db.exec(readFileSync(join(rb, '20261123120200_order_form_storage.down.sql'), 'utf8'))
   expect(await count()).toEqual({ buckets: 0, policies: 0 })
   // with storage gone, the order-form rollback also runs (its functions are no longer used by policies)
   await db.exec(readFileSync(join(rb, '20261123120100_order_form.down.sql'), 'utf8'))
   await db.exec(readFileSync(join(mig, '20261123120100_order_form.sql'), 'utf8'))
   await db.exec(readFileSync(join(mig, '20261123120200_order_form_storage.sql'), 'utf8'))
+  await db.exec(readFileSync(join(mig, '20261124120000_order_form_security.sql'), 'utf8'))
   expect(await count()).toEqual({ buckets: 2, policies: 6 })
+  expect(await trig()).toBe(5)
   await db.close()
 }, 60000)
