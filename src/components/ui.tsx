@@ -14,7 +14,7 @@ const STATUS_CLASS: Record<ItemStatus, string> = {
 export const STATUS_COLOR: Record<ItemStatus, string> = {
   ordered: 'var(--text-subtle)',
   sent_to_vendor: 'var(--amber)',
-  received: 'var(--accent)',
+  received: 'var(--ok)',
   handed_over: 'var(--blue)',
 }
 

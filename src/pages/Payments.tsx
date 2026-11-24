@@ -294,7 +294,7 @@ export default function Payments() {
                     </span>
                   </div>
                   <div className="progress" aria-hidden>
-                    <span style={{ width: `${(t.nConfirmed / t.n) * 100}%`, background: 'var(--accent)' }} />
+                    <span style={{ width: `${(t.nConfirmed / t.n) * 100}%`, background: 'var(--ok)' }} />
                     <span style={{ width: `${(t.problems / t.n) * 100}%`, background: 'var(--red)' }} />
                   </div>
                 </button>

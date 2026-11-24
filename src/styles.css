@@ -19,6 +19,10 @@
   --accent-soft: rgba(62, 207, 142, 0.1);
   --accent-border: rgba(62, 207, 142, 0.32);
 
+  /* "good" status (in MART, received, confirmed): the same green in every theme */
+  --ok: #3ecf8e;
+  --ok-soft: rgba(62, 207, 142, 0.1);
+  --ok-border: rgba(62, 207, 142, 0.32);
   --amber: #f5b14c;
   --amber-soft: rgba(245, 177, 76, 0.1);
   --amber-border: rgba(245, 177, 76, 0.3);
@@ -41,13 +45,14 @@
   --radius-lg: 12px;
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
   --font: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --heading-font: var(--font);
   --mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   --sidebar-w: 244px;
   --bottom-nav-h: 64px;
   color-scheme: dark;
 }
 
-:root[data-theme='light'] {
+:root[data-mode='light'] {
   --bg: #fbfbfb;
   --bg-sidebar: #f5f5f5;
   --surface: #ffffff;
@@ -64,6 +69,9 @@
   --accent-text: #ffffff;
   --accent-soft: rgba(31, 163, 106, 0.09);
   --accent-border: rgba(31, 163, 106, 0.35);
+  --ok: #1a8f5c;
+  --ok-soft: rgba(26, 143, 92, 0.09);
+  --ok-border: rgba(26, 143, 92, 0.35);
   --amber: #b26b00;
   --blue: #2563eb;
   --red: #dc2626;
@@ -452,7 +460,7 @@ textarea {
   color: var(--text-subtle);
 }
 .stat.accent .stat-value {
-  color: var(--accent);
+  color: var(--ok);
 }
 
 .progress {
@@ -777,9 +785,9 @@ input[type='checkbox'] {
   background: currentColor;
 }
 .badge-green {
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
+  color: var(--ok);
+  background: var(--ok-soft);
+  border-color: var(--ok-border);
 }
 .badge-amber {
   color: var(--amber);
@@ -999,7 +1007,7 @@ kbd {
   min-height: 22px;
 }
 .scan-message.ok {
-  color: var(--accent);
+  color: var(--ok);
   font-weight: 600;
 }
 .scan-choices {
@@ -1461,7 +1469,7 @@ kbd {
   animation: pop 0.16s ease-out;
 }
 .toast.ok svg {
-  color: var(--accent);
+  color: var(--ok);
 }
 .toast.err {
   border-color: var(--red-border);
@@ -1546,9 +1554,9 @@ kbd {
   color: var(--red);
 }
 .callout.ok {
-  border-color: var(--accent-border);
-  background: var(--accent-soft);
-  color: var(--accent);
+  border-color: var(--ok-border);
+  background: var(--ok-soft);
+  color: var(--ok);
 }
 
 .dropzone {
@@ -1720,7 +1728,7 @@ details.disclosure summary::-webkit-details-marker {
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border);
   }
-  :root[data-theme='light'] .mobile-top {
+  :root[data-mode='light'] .mobile-top {
     background: rgba(251, 251, 251, 0.9);
   }
   .mobile-top .title {
@@ -1745,7 +1753,7 @@ details.disclosure summary::-webkit-details-marker {
     backdrop-filter: blur(10px);
     border-top: 1px solid var(--border);
   }
-  :root[data-theme='light'] .bottom-nav {
+  :root[data-mode='light'] .bottom-nav {
     background: rgba(245, 245, 245, 0.95);
   }
   .bottom-nav a,
@@ -2034,4 +2042,435 @@ details.disclosure summary::-webkit-details-marker {
     padding: 4px 8px;
     font-size: 11px;
   }
+}
+
+/* ================================================================== fun themes
+   Colours per theme (status colours amber/blue/red stay from the dark or light base, so
+   "ready", "problem" etc. look the same everywhere). Light themes also get data-mode='light'. */
+
+body {
+  background-image: var(--bg-art, none);
+  background-attachment: fixed;
+}
+.page-head h1,
+.brand > div,
+.modal-head h2,
+.login-card h1 {
+  font-family: var(--heading-font);
+}
+.brand small {
+  font-family: var(--font);
+}
+:root:is([data-theme='christmas'], [data-theme='barbie'], [data-theme='diwali'], [data-theme='holi'], [data-theme='halloween'], [data-theme='arcade'], [data-theme='hacker']) .mobile-top,
+:root:is([data-theme='christmas'], [data-theme='barbie'], [data-theme='diwali'], [data-theme='holi'], [data-theme='halloween'], [data-theme='arcade'], [data-theme='hacker']) .bottom-nav {
+  background: color-mix(in srgb, var(--bg-sidebar) 92%, transparent);
+}
+
+:root[data-theme='christmas'] {
+  --bg: #0d2016;
+  --bg-sidebar: #0a1a11;
+  --surface: #13291c;
+  --surface-2: #183222;
+  --surface-3: #1e3b29;
+  --hover: rgba(245, 196, 81, 0.06);
+  --border: #24412f;
+  --border-strong: #2f5139;
+  --text: #f6f2e6;
+  --text-muted: #c6ccb9;
+  --text-subtle: #8c9a87;
+  --accent: #d12f2f;
+  --accent-hover: #e04444;
+  --accent-text: #ffffff;
+  --accent-soft: rgba(209, 47, 47, 0.16);
+  --accent-border: rgba(209, 47, 47, 0.45);
+  --heading-font: 'Mountains of Christmas', var(--font);
+  --bg-art: radial-gradient(circle at 15% 0%, rgba(245, 196, 81, 0.08), transparent 40%),
+    radial-gradient(circle at 90% 100%, rgba(209, 47, 47, 0.1), transparent 45%);
+}
+:root[data-theme='christmas'] .page-head h1 {
+  font-weight: 700;
+  font-size: 30px;
+}
+:root[data-theme='christmas'] .brand-mark {
+  background: repeating-linear-gradient(45deg, #d12f2f 0 6px, #ffffff 6px 12px);
+  color: #0d2016;
+}
+
+:root[data-theme='barbie'] {
+  --bg: #ffeef6;
+  --bg-sidebar: #ffe1ef;
+  --surface: #ffffff;
+  --surface-2: #fff5fa;
+  --surface-3: #ffe8f2;
+  --hover: rgba(208, 20, 122, 0.06);
+  --border: #f8c9de;
+  --border-strong: #f2a9c9;
+  --text: #3d0d26;
+  --text-muted: #7a3a5a;
+  --text-subtle: #b0708f;
+  --accent: #d0147a;
+  --accent-hover: #b30f68;
+  --accent-text: #ffffff;
+  --accent-soft: rgba(208, 20, 122, 0.1);
+  --accent-border: rgba(208, 20, 122, 0.35);
+  --heading-font: 'Pacifico', var(--font);
+  --shadow: 0 8px 30px rgba(208, 20, 122, 0.15);
+  --bg-art: radial-gradient(circle at 100% 0%, rgba(255, 143, 200, 0.35), transparent 40%),
+    radial-gradient(circle at 0% 100%, rgba(255, 143, 200, 0.25), transparent 40%);
+}
+:root[data-theme='barbie'] .page-head h1 {
+  font-weight: 400;
+  color: #d0147a;
+}
+:root[data-theme='barbie'] .btn-primary {
+  border-radius: 999px;
+}
+
+:root[data-theme='diwali'] {
+  --bg: #160c2e;
+  --bg-sidebar: #120a26;
+  --surface: #1e1340;
+  --surface-2: #261a4d;
+  --surface-3: #2f2159;
+  --hover: rgba(255, 176, 32, 0.07);
+  --border: #3a2a66;
+  --border-strong: #4a3780;
+  --text: #fdf3e1;
+  --text-muted: #d8c6a8;
+  --text-subtle: #a08fb3;
+  --accent: #ffb020;
+  --accent-hover: #ffc24d;
+  --accent-text: #2a1500;
+  --accent-soft: rgba(255, 176, 32, 0.13);
+  --accent-border: rgba(255, 176, 32, 0.42);
+  --heading-font: 'Yatra One', var(--font);
+  --bg-art: radial-gradient(circle at 50% 0%, rgba(255, 176, 32, 0.12), transparent 45%),
+    radial-gradient(circle at 0% 100%, rgba(255, 94, 58, 0.1), transparent 40%);
+}
+
+:root[data-theme='holi'] {
+  --bg: #fffaf3;
+  --bg-sidebar: #fff3e6;
+  --surface: #ffffff;
+  --surface-2: #fff7ef;
+  --surface-3: #fdeede;
+  --hover: rgba(196, 29, 143, 0.05);
+  --border: #f3dcc6;
+  --border-strong: #e8c4a2;
+  --text: #2b1b2e;
+  --text-muted: #6b5470;
+  --text-subtle: #a08aa3;
+  --accent: #c41d8f;
+  --accent-hover: #a8187a;
+  --accent-text: #ffffff;
+  --accent-soft: rgba(196, 29, 143, 0.09);
+  --accent-border: rgba(196, 29, 143, 0.32);
+  --heading-font: 'Baloo 2', var(--font);
+  --bg-art: radial-gradient(circle at 8% 12%, rgba(255, 62, 165, 0.22), transparent 18%),
+    radial-gradient(circle at 92% 18%, rgba(255, 196, 0, 0.28), transparent 20%),
+    radial-gradient(circle at 80% 85%, rgba(46, 204, 113, 0.2), transparent 20%),
+    radial-gradient(circle at 15% 88%, rgba(59, 130, 246, 0.2), transparent 20%),
+    radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.08), transparent 30%);
+}
+:root[data-theme='holi'] .page-head h1 {
+  font-weight: 800;
+  background: linear-gradient(90deg, #ff3ea5, #ff6b00, #ffc400, #2ecc71, #3b82f6, #a855f7);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+:root[data-theme='halloween'] {
+  --bg: #120c18;
+  --bg-sidebar: #0e0913;
+  --surface: #1b1224;
+  --surface-2: #22172d;
+  --surface-3: #2b1d38;
+  --hover: rgba(255, 122, 26, 0.07);
+  --border: #34243f;
+  --border-strong: #45304f;
+  --text: #f3ead9;
+  --text-muted: #c5b4c9;
+  --text-subtle: #8d7a93;
+  --accent: #ff7a1a;
+  --accent-hover: #ff9140;
+  --accent-text: #1a0b00;
+  --accent-soft: rgba(255, 122, 26, 0.13);
+  --accent-border: rgba(255, 122, 26, 0.42);
+  --heading-font: 'Creepster', var(--font);
+  --bg-art: radial-gradient(circle at 85% 8%, rgba(255, 236, 180, 0.12), transparent 12%),
+    radial-gradient(circle at 10% 100%, rgba(139, 92, 246, 0.14), transparent 45%);
+}
+:root[data-theme='halloween'] .page-head h1 {
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: #ff7a1a;
+}
+
+:root[data-theme='arcade'] {
+  --bg: #0d0221;
+  --bg-sidebar: #0a011a;
+  --surface: #160536;
+  --surface-2: #1d0845;
+  --surface-3: #250b55;
+  --hover: rgba(33, 230, 255, 0.07);
+  --border: #34106e;
+  --border-strong: #4a1a92;
+  --text: #f2e9ff;
+  --text-muted: #c4b2e8;
+  --text-subtle: #8a74b8;
+  --accent: #ff2fb9;
+  --accent-hover: #ff5ccb;
+  --accent-text: #1a0014;
+  --accent-soft: rgba(255, 47, 185, 0.14);
+  --accent-border: rgba(255, 47, 185, 0.5);
+  --heading-font: 'Orbitron', var(--font);
+  --bg-art: linear-gradient(transparent 62%, rgba(255, 47, 185, 0.06) 62%),
+    repeating-linear-gradient(90deg, rgba(33, 230, 255, 0.07) 0 1px, transparent 1px 64px),
+    repeating-linear-gradient(0deg, rgba(33, 230, 255, 0.05) 0 1px, transparent 1px 64px),
+    radial-gradient(circle at 50% 110%, rgba(255, 47, 185, 0.25), transparent 50%);
+}
+:root[data-theme='arcade'] .page-head h1 {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 12px rgba(255, 47, 185, 0.7), 0 0 2px #fff;
+}
+:root[data-theme='arcade'] .btn-primary {
+  box-shadow: 0 0 14px rgba(255, 47, 185, 0.55);
+}
+
+:root[data-theme='hacker'] {
+  --bg: #000a00;
+  --bg-sidebar: #000600;
+  --surface: #031203;
+  --surface-2: #051a05;
+  --surface-3: #072207;
+  --hover: rgba(51, 255, 102, 0.07);
+  --border: #0d3b0d;
+  --border-strong: #145214;
+  --text: #b6ffb6;
+  --text-muted: #6fdc6f;
+  --text-subtle: #3f9f3f;
+  --accent: #33ff66;
+  --accent-hover: #66ff8c;
+  --accent-text: #001a05;
+  --accent-soft: rgba(51, 255, 102, 0.1);
+  --accent-border: rgba(51, 255, 102, 0.4);
+  --font: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --heading-font: var(--font);
+}
+:root[data-theme='hacker'] .page-head h1::before {
+  content: '> ';
+  color: var(--accent);
+}
+:root[data-theme='hacker'] .page-head h1::after {
+  content: '_';
+  animation: blink 1s steps(1) infinite;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- decorations */
+.decor {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+}
+.decor span {
+  position: absolute;
+  display: block;
+  will-change: transform, opacity;
+}
+.decor-snow span {
+  top: -24px;
+  color: #fff;
+  opacity: 0.7;
+  animation: fall linear infinite;
+}
+@keyframes fall {
+  to {
+    transform: translate3d(30px, 110vh, 0) rotate(240deg);
+  }
+}
+.decor-sparkles span {
+  color: #ff5fb0;
+  animation: twinkle ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.4) rotate(0deg);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1) rotate(90deg);
+  }
+}
+.decor-lights {
+  bottom: auto;
+  height: 22px;
+}
+.decor-lights::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 4px;
+  border-top: 1px solid rgba(255, 220, 150, 0.35);
+}
+.decor-lights span {
+  top: 4px;
+  width: 8px;
+  height: 11px;
+  margin-left: -4px;
+  border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+  background: var(--bulb);
+  box-shadow: 0 0 10px 2px var(--bulb);
+  animation: glow ease-in-out infinite alternate;
+}
+@keyframes glow {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.decor-powder span {
+  bottom: -60px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--dot), transparent 70%);
+  opacity: 0.45;
+  animation: drift linear infinite;
+}
+@keyframes drift {
+  to {
+    transform: translate3d(-40px, -115vh, 0) scale(1.6);
+    opacity: 0;
+  }
+}
+.decor-bats span {
+  left: -60px !important;
+  font-size: 22px;
+  opacity: 0.8;
+  animation: flap linear infinite;
+}
+@keyframes flap {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  25% {
+    transform: translate3d(30vw, -30px, 0);
+  }
+  50% {
+    transform: translate3d(60vw, 20px, 0);
+  }
+  75% {
+    transform: translate3d(90vw, -20px, 0);
+  }
+  100% {
+    transform: translate3d(120vw, 0, 0);
+  }
+}
+.decor-code span {
+  top: -60vh;
+  white-space: pre;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  line-height: 1.25;
+  color: #33ff66;
+  opacity: 0.16;
+  animation: rain linear infinite;
+}
+@keyframes rain {
+  to {
+    transform: translate3d(0, 170vh, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .decor {
+    display: none;
+  }
+}
+@media print {
+  .decor {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- theme picker */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  font-family: var(--font);
+}
+.theme-card:hover {
+  border-color: var(--border-strong);
+}
+.theme-card.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.theme-preview {
+  position: relative;
+  display: flex;
+  gap: 4px;
+  height: 64px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.theme-preview-side {
+  width: 22%;
+  border-radius: 4px;
+}
+.theme-preview-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.theme-preview-body span {
+  height: 10px;
+  border-radius: 3px;
+}
+.theme-preview-body .theme-preview-btn {
+  width: 45%;
+  height: 12px;
+  border-radius: 6px;
+}
+.theme-preview-body .theme-preview-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.theme-preview-emoji {
+  position: absolute;
+  right: 6px;
+  bottom: 2px;
+  font-size: 24px;
+}
+.theme-card-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
 }
