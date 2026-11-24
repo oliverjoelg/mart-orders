@@ -15,7 +15,8 @@ describe('usage page maths', () => {
     const y = yearsLeft({ db_bytes: 10 * MB, public_bytes: 5 * MB, first_round_at: '2026-01-01T00:00:00Z', measured_at: '2027-01-01T00:00:00Z' })
     expect(y).toBeCloseTo(98, 0)
   })
-  it('has no estimate before the first round', () => {
+  it('has no estimate before the first round, or in the first two months (one big upload)', () => {
     expect(yearsLeft({ db_bytes: 10 * MB, public_bytes: 0, first_round_at: null, measured_at: '2027-01-01T00:00:00Z' })).toBeNull()
+    expect(yearsLeft({ db_bytes: 13 * MB, public_bytes: 1.3 * MB, first_round_at: '2026-11-19T00:00:00Z', measured_at: '2026-11-24T00:00:00Z' })).toBeNull()
   })
 })

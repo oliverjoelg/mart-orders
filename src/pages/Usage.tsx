@@ -41,7 +41,9 @@ export function formatBytes(n: number): string {
 /** Rough years until the database is full, from how fast our own tables grew since the first round. */
 export function yearsLeft(u: Pick<UsageStats, 'db_bytes' | 'public_bytes' | 'first_round_at' | 'measured_at'>, limit = DB_LIMIT): number | null {
   if (!u.first_round_at) return null
-  const days = Math.max(7, (Date.parse(u.measured_at) - Date.parse(u.first_round_at)) / 86400_000)
+  const days = (Date.parse(u.measured_at) - Date.parse(u.first_round_at)) / 86400_000
+  // the first weeks are one big upload; a pace from them would be far too gloomy
+  if (days < 60) return null
   const perYear = (u.public_bytes / days) * 365
   if (perYear <= 0) return null
   return Math.max(0, (limit - u.db_bytes) / perYear)
@@ -133,7 +135,7 @@ export default function Usage() {
               <TrendingUp size={16} /> <b>How long until it's full</b>
             </div>
             <div style={{ fontSize: 22, fontWeight: 600 }}>
-              {years === null ? 'Not enough history yet' : years > 50 ? 'More than 50 years' : `About ${years < 1 ? 'less than a year' : `${Math.round(years)} years`}`}
+              {years === null ? 'Not enough history yet (check back after a couple of months)' : years > 50 ? 'More than 50 years' : `About ${years < 1 ? 'less than a year' : `${Math.round(years)} years`}`}
             </div>
             <span className="hint">
               A rough guess at the current pace: {plural(u.orders, 'item')} ordered since {u.first_round_at ? formatDateTime(u.first_round_at) : '—'}. Each
