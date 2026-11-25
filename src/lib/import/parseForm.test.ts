@@ -1,3 +1,4 @@
+import Papa from 'papaparse'
 import { describe, expect, it } from 'vitest'
 import { buildColumnMap } from './headers'
 import { parseFormCsv, type ExistingItem } from './parseForm'
@@ -173,5 +174,58 @@ describe('payment columns', () => {
       ['QR', 'T2', 1049],
     ])
     expect(p.responses[0].source_timestamp).not.toBeNull()
+  })
+})
+
+describe('2026 hoodie form layout ("Select your winter merch")', () => {
+  const H = [
+    'Timestamp', 'Email Address', 'Your Name', 'Roll Number', 'Section ',
+    'Select your winter merch.\nNote: We have created relaxed version of these designs\n Official merch value = 50-60 euros. \n MART value = Rs 1050-1100 ',
+    'Size', 'Do you want to order another item?', 'Select your winter merch', 'Size 2',
+    'Do you want to order another item? 2', 'Select your winter merch 2', 'Size 3',
+    'Select QR Code', 'Transaction ID', 'Total number of items bought', 'Amount Paid',
+    'Upload Screenshot of Payment. \nMake sure Transaction ID, Amount and other details are presesnt',
+  ]
+  const HOODIES = [
+    { id: 'h-emlyon', campaign_id: 'c2', name: 'Emlyon Hoodie', colour: 'Emlyon', price_inr: 1049, sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], form_keywords: ['emlyon', 'hoodie'], sort_order: 1 },
+    { id: 'h-escp', campaign_id: 'c2', name: 'ESCP Hoodie', colour: 'ESCP', price_inr: 1049, sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], form_keywords: ['escp', 'hoodie'], sort_order: 2 },
+    { id: 'h-zip', campaign_id: 'c2', name: 'ESCP Quarter Zip', colour: 'ESCP Zip', price_inr: 1099, sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], form_keywords: ['escp', 'quarter', 'zip'], sort_order: 3 },
+  ]
+  const EM = 'Emlyon Hoodie (Relaxed Fit)   ₹1049'
+  const ES = 'ESCP Hoodie (Relaxed fit)  ₹1049'
+  const QZ = 'ESCP Quarter Zip (Relaxed Fit)  ₹1099'
+  const row = (cells: string[]) => cells
+  const csv = Papa.unparse([
+    H,
+    row(['11/20/2026 10:00:00', 'a@example.test', 'Asha Rao', 'IB26-001', 'IB A', EM, 'M', 'No', '', '', '', '', '', 'Deepanshu', 'T1', '1', '1049', 'https://drive.google.com/a']),
+    row(['11/20/2026 10:05:00', 'b@example.test', 'Ben Das', 'IB26-002', 'IB B', QZ, 'L', 'Yes', EM, 'XL', 'No', '', '', 'Deepanshu', 'T2', '2', '2148', 'https://drive.google.com/b']),
+    row(['11/20/2026 10:10:00', 'c@example.test', 'Cara Sen', 'IB26-003', 'IB A', ES, 'S', 'No', '', '', '', '', '', 'Tanvi', 'T3', '1', '1049', 'https://drive.google.com/c']),
+    // started the form, never paid: no roll number
+    row(['', '', 'Dev Nair', '', 'IB B', EM, 'L', '', '', '', '', '', '', '', '', '', '', '']),
+  ])
+
+  it('reads product, second item, name, section and who was paid', () => {
+    const map = buildColumnMap(H)
+    expect(map.slots).toHaveLength(3)
+    expect(map.slots[0].colour).toEqual([5])
+    expect(map.slots[1].colour).toEqual([8])
+    expect(map.buyerName).toBe(2)
+    expect(map.paidTo).toBe(13)
+    expect(map.txn).toBe(14)
+    expect(map.screenshot).toBe(17)
+  })
+
+  it('matches the three products and skips the abandoned row', () => {
+    const p = parseFormCsv(csv, HOODIES)
+    const ok = p.items.filter((i) => i.include)
+    expect(ok.map((i) => [i.roll_no, i.product_id, i.size])).toEqual([
+      ['IB26-001', 'h-emlyon', 'M'],
+      ['IB26-002', 'h-zip', 'L'],
+      ['IB26-002', 'h-emlyon', 'XL'],
+      ['IB26-003', 'h-escp', 'S'],
+    ])
+    expect(p.items.find((i) => !i.roll_no)?.issues).toContain('missing_roll')
+    expect(p.buyers.find((b) => b.roll_no === 'IB26-002')?.name).toBe('Ben Das')
+    expect(p.responses.filter((r) => r.roll_no).map((r) => r.paid_to)).toEqual(['Deepanshu', 'Deepanshu', 'Tanvi'])
   })
 })

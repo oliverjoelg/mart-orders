@@ -73,9 +73,14 @@ export function classifyHeader(raw: string): HeaderKind {
   if (h.includes('screenshot')) return 'screenshot'
   if (/^(transaction|txn|utr|upi ref)/.test(h)) return 'txn'
   if (/^(payment|paid to|pay to)/.test(h) && /qr|scan|paid to|pay to/.test(h)) return 'paidTo'
+  // other forms word these differently (e.g. the 2026 hoodie form: "Select QR Code",
+  // "Select your winter merch", "Do you want to order another item?", "Your Name")
+  if (/\bqr\b/.test(h)) return 'paidTo'
   if (h.includes('email')) return 'email'
   if (h.includes('name to be displayed') || h.includes('back')) return 'print'
-  if (h.startsWith('name')) return 'buyerName'
+  if (/^(your |full |student )?name\b/.test(h)) return 'buyerName'
+  if (h.startsWith('add another') || /\b(order|add|buy) another\b/.test(h)) return 'addAnother'
+  if (/^(select|choose|pick)\b.*\b(merch|item|product|hoodie|t-?shirt|design)/.test(h) || /^(merch|item|product)\b/.test(h)) return 'colour'
   if (h.includes('phone') || h.includes('mobile')) return 'phone'
   if (h.includes('roll')) return 'roll'
   if (h.startsWith('total')) return 'total'
