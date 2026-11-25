@@ -793,6 +793,37 @@ describe('order form', () => {
     })
   })
 
+  describe('form theme (super admins only)', () => {
+    const look = () => db.transaction(async (tx) => {
+      await tx.exec('set local role anon')
+      return (await tx.query<{ form_look: string }>(`select public.form_look()`)).rows[0].form_look
+    })
+    it('starts as tees and anyone, signed in or not, can read the open round look', async () => {
+      expect(await look()).toBe('tees')
+      const r = await as<{ form_look: string }>('student', `select public.form_look()`)
+      expect(r.rows[0].form_look).toBe('tees')
+    })
+    it('a super admin switches the round to hoodies and back', async () => {
+      await as('main', `select public.form_set_theme($1, 'hoodies')`, [campaignId])
+      expect(await look()).toBe('hoodies')
+      await as('main', `select public.form_set_theme($1, 'tees')`, [campaignId])
+      expect(await look()).toBe('tees')
+    })
+    it('form admins, MART admins and students cannot change it, directly or through the function', async () => {
+      for (const w of ['formadmin', 'admin', 'student'] as const) {
+        expect(await fails(as(w, `select public.form_set_theme($1, 'hoodies')`, [campaignId]))).toMatch(/Only MART super admins/)
+      }
+      expect(await fails(as('formadmin', `update public.form_rounds set theme = 'hoodies' where campaign_id = $1`, [campaignId]))).toMatch(/Only MART super admins/)
+      // other round settings still work for the form admin
+      await as('formadmin', `update public.form_rounds set intro = 'Collect from MART' where campaign_id = $1`, [campaignId])
+      expect(await look()).toBe('tees')
+    })
+    it('only known themes', async () => {
+      expect(await fails(as('main', `select public.form_set_theme($1, 'neon')`, [campaignId]))).toMatch(/Unknown theme/)
+      expect(await fails(db.query(`update public.form_rounds set theme = 'neon' where campaign_id = $1`, [campaignId]))).toMatch(/check constraint/)
+    })
+  })
+
   describe('a student orders', () => {
     it('reads the open round, shown products and live QR', async () => {
       const r = await as<{ get_order_form: { round: { item_cap: number }; products: { id: string }[]; qr: { id: string } } }>('student', `select public.get_order_form()`)
