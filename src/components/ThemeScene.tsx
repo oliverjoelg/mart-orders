@@ -1,14 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ComponentType } from 'react'
 import { useLocation } from 'react-router-dom'
-import type { ThemeDef } from '../lib/themes'
+import type { SceneId, ThemeDef } from '../lib/themes'
+import { ArcadeMoment, ArcadeScene } from './scenes/arcade'
+import { BarbieMoment, BarbieScene } from './scenes/barbie'
 import ChristmasScene from './scenes/ChristmasScene'
+import { DiwaliMoment, DiwaliScene } from './scenes/diwali'
+import { HackerMoment, HackerScene } from './scenes/hacker'
+import { HalloweenMoment, HalloweenScene } from './scenes/halloween'
+import { HoliMoment, HoliScene } from './scenes/holi'
 import SantaMoment from './scenes/SantaMoment'
 
 /**
- * A fun theme's background scene (behind the app) and its occasional "moment" (e.g. Santa's
- * sleigh). Moments are rare and polite: never on the busy screens, never while someone types or
- * scrolls, never in a background tab, and not at all with decorations off or reduced motion.
+ * A fun theme's background scene (behind the app) and its occasional "moment" (Santa's sleigh,
+ * the arcade mini-game, fireworks…). Moments are rare and polite: never on the busy screens,
+ * never while someone types or scrolls, never in a background tab or with a pop-up open, and not
+ * at all with decorations off or reduced motion.
  */
+
+const SCENES: Record<SceneId, { Scene: ComponentType; Moment: ComponentType<{ onDone(): void }> }> = {
+  christmas: { Scene: ChristmasScene, Moment: SantaMoment },
+  barbie: { Scene: BarbieScene, Moment: BarbieMoment },
+  diwali: { Scene: DiwaliScene, Moment: DiwaliMoment },
+  holi: { Scene: HoliScene, Moment: HoliMoment },
+  halloween: { Scene: HalloweenScene, Moment: HalloweenMoment },
+  arcade: { Scene: ArcadeScene, Moment: ArcadeMoment },
+  hacker: { Scene: HackerScene, Moment: HackerMoment },
+}
 
 // screens where people are working fast: no surprises there
 const BUSY = ['/desk', '/receive', '/import']
@@ -17,13 +34,14 @@ const GAP_MS = [70_000, 130_000] as const
 
 export default function ThemeScene({ theme, decor }: { theme: ThemeDef; decor: boolean }) {
   const location = useLocation()
-  const [moment, setMoment] = useState(false)
+  const [moment, setMoment] = useState(0)
   const lastScroll = useRef(0)
   const path = useRef(location.pathname)
   path.current = location.pathname
 
   const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  const enabled = decor && !reduced && !!theme.moment
+  const entry = theme.scene ? SCENES[theme.scene] : null
+  const enabled = decor && !reduced && !!entry
 
   const allowedNow = useCallback(() => {
     if (document.hidden) return false
@@ -43,17 +61,15 @@ export default function ThemeScene({ theme, decor }: { theme: ThemeDef; decor: b
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // schedule moments
+  // schedule moments (a new key each time, so every moment starts fresh)
   useEffect(() => {
-    if (!enabled) {
-      setMoment(false)
-      return
-    }
+    setMoment(0)
+    if (!enabled) return
     let timer = 0
     const plan = (ms: number) => {
       timer = window.setTimeout(() => {
-        if (allowedNow()) setMoment(true)
-        else plan(15_000) // try again a bit later
+        if (allowedNow()) setMoment(Date.now())
+        else plan(15_000)
       }, ms)
     }
     plan(FIRST_MS)
@@ -63,24 +79,25 @@ export default function ThemeScene({ theme, decor }: { theme: ThemeDef; decor: b
       window.clearTimeout(timer)
       window.removeEventListener('mart:moment-done', again)
     }
-  }, [enabled, allowedNow])
+  }, [enabled, allowedNow, theme.id])
 
-  // demo builds: window.__martMoment() shows one now (for checking the animation)
+  // demo builds: window.__martMoment() shows one now (for checking the animations)
   useEffect(() => {
     if (import.meta.env.MODE !== 'demo' && !import.meta.env.DEV) return
-    ;(window as unknown as { __martMoment?: () => void }).__martMoment = () => setMoment(true)
+    ;(window as unknown as { __martMoment?: () => void }).__martMoment = () => setMoment(Date.now())
   }, [])
 
   const done = useCallback(() => {
-    setMoment(false)
+    setMoment(0)
     window.dispatchEvent(new Event('mart:moment-done'))
   }, [])
 
-  if (!decor || !theme.scene) return null
+  if (!decor || !entry) return null
+  const { Scene, Moment } = entry
   return (
     <>
-      {theme.scene === 'christmas' && <ChristmasScene />}
-      {moment && enabled && theme.moment === 'sleigh' && <SantaMoment onDone={done} />}
+      <Scene />
+      {moment > 0 && enabled && <Moment key={moment} onDone={done} />}
     </>
   )
 }
