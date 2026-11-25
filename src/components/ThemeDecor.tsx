@@ -13,7 +13,7 @@ function rand(seed: number) {
   return x - Math.floor(x)
 }
 
-const COUNT: Record<Exclude<Decor, null>, number> = { snow: 36, sparkles: 18, lights: 22, powder: 16, bats: 4, code: 14 }
+const COUNT: Record<Exclude<Decor, null>, number> = { snow: 14, sparkles: 18, lights: 22, powder: 16, bats: 4, code: 14 }
 const GLYPHS = 'MART0123456789アイウエオカキクケコ'
 
 export default function ThemeDecor({ decor }: { decor: Decor }) {

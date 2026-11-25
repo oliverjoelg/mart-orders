@@ -28,6 +28,7 @@ import { allRoles } from '../lib/permissions'
 import { memberLabel, type Role } from '../lib/types'
 import { applyTheme, decorOn, savedTheme, setDecorOn, type ThemeDef } from '../lib/themes'
 import ThemeDecor from './ThemeDecor'
+import ThemeScene from './ThemeScene'
 import ThemePicker from './ThemePicker'
 import { Avatar, Modal, RoleBadge } from './ui'
 
@@ -161,6 +162,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="app">
+      <ThemeScene theme={theme} decor={decor} />
       <aside className="sidebar">
         <div className="brand">
           <BrandMark />
