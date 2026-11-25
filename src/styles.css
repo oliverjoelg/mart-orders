@@ -2048,9 +2048,15 @@ details.disclosure summary::-webkit-details-marker {
    Colours per theme (status colours amber/blue/red stay from the dark or light base, so
    "ready", "problem" etc. look the same everywhere). Light themes also get data-mode='light'. */
 
-body {
+/* the page background lives on <html> only (it is painted under everything), so a theme's
+   scene can sit between it and the app; <body> stays see-through */
+html {
+  background-color: var(--bg);
   background-image: var(--bg-art, none);
   background-attachment: fixed;
+}
+body {
+  background: transparent;
 }
 .page-head h1,
 .brand > div,
@@ -2473,4 +2479,253 @@ body {
   align-items: center;
   justify-content: space-between;
   font-weight: 600;
+}
+
+/* ================================================================== scenes & moments
+   Scene = drawn behind the app (sidebar and main sit above it). Moment = rare animation on top. */
+/* below the page itself (z-index -1 on the root stacking context): above the page background,
+   under everything else, so modals and the scanner stay on top */
+.scene {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Christmas: see-through cards so the night shows through softly */
+:root[data-theme='christmas'] {
+  --surface: rgba(19, 41, 28, 0.82);
+  --bg-sidebar: rgba(10, 26, 17, 0.9);
+  --bg: #0b1b2a;
+  --bg-art: linear-gradient(180deg, #071422 0%, #0b2233 45%, #0f2a22 100%);
+}
+.scene-christmas .scene-moon {
+  position: absolute;
+  top: 7%;
+  right: 9%;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 38%, #fffbe8, #f1e6bd 60%, #d9cfa6);
+  box-shadow: 0 0 60px 18px rgba(255, 246, 210, 0.18);
+}
+.scene-star {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff8d6;
+  animation: star-twinkle 4s ease-in-out infinite;
+}
+@keyframes star-twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.scene-flake {
+  position: absolute;
+  top: -12px;
+  border-radius: 50%;
+  background: #ffffff;
+  opacity: 0.5;
+  filter: blur(0.6px);
+  animation: scene-fall linear infinite;
+}
+@keyframes scene-fall {
+  to {
+    transform: translate3d(40px, 105vh, 0);
+  }
+}
+.scene-hills {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 200px;
+}
+.scene-window-glow {
+  animation: window-glow 3s ease-in-out infinite alternate;
+}
+@keyframes window-glow {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 767px) {
+  .scene-hills {
+    height: 120px;
+    bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) - 10px);
+  }
+  .scene-christmas .scene-moon {
+    width: 46px;
+    height: 46px;
+    top: 9%;
+  }
+}
+
+/* moment: Santa's sleigh */
+.moment {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  overflow: hidden;
+  pointer-events: none;
+}
+.sleigh {
+  position: absolute;
+  top: 18px;
+  left: 0;
+  animation: sleigh-fly linear forwards;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+}
+@keyframes sleigh-fly {
+  from {
+    transform: translate3d(-340px, 30px, 0) rotate(-4deg);
+  }
+  to {
+    transform: translate3d(calc(100vw + 40px), -10px, 0) rotate(-6deg);
+  }
+}
+.sleigh-bob {
+  animation: sleigh-bob 1.1s ease-in-out infinite alternate;
+}
+@keyframes sleigh-bob {
+  from {
+    transform: translateY(-5px);
+  }
+  to {
+    transform: translateY(6px);
+  }
+}
+.sleigh .leg {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: gallop 0.42s ease-in-out infinite alternate;
+}
+.sleigh .leg-b {
+  animation-delay: -0.21s;
+}
+@keyframes gallop {
+  from {
+    transform: rotate(-16deg);
+  }
+  to {
+    transform: rotate(16deg);
+  }
+}
+.sleigh .rudolph {
+  animation: nose 0.8s ease-in-out infinite alternate;
+}
+@keyframes nose {
+  from {
+    filter: drop-shadow(0 0 2px #ff2b2b);
+  }
+  to {
+    filter: drop-shadow(0 0 9px #ff5c5c);
+  }
+}
+.sleigh .santa-arm {
+  transform-box: fill-box;
+  transform-origin: 100% 100%;
+  animation: toss 0.8s ease-in-out infinite;
+}
+@keyframes toss {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0deg);
+  }
+  30% {
+    transform: rotate(-35deg);
+  }
+}
+.candy {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: manipulation;
+  padding: 6px;
+  margin: -6px;
+  animation: candy-fall 2.8s cubic-bezier(0.45, 0, 0.75, 0.6) forwards;
+}
+@keyframes candy-fall {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  72% {
+    transform: translate3d(30px, var(--fall), 0) rotate(var(--spin));
+  }
+  82% {
+    transform: translate3d(36px, calc(var(--fall) - 22px), 0) rotate(calc(var(--spin) + 30deg));
+  }
+  90% {
+    transform: translate3d(40px, var(--fall), 0) rotate(calc(var(--spin) + 40deg));
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(40px, var(--fall), 0) rotate(calc(var(--spin) + 40deg));
+    opacity: 0;
+  }
+}
+.candy.caught {
+  pointer-events: none;
+  animation: candy-caught 0.35s ease-out forwards;
+}
+@keyframes candy-caught {
+  to {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+.candy-pop {
+  position: fixed;
+  z-index: 46;
+  transform: translate(-50%, -120%);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #d12f2f;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: pop-up 1.2s ease-out forwards;
+}
+.candy-pop small {
+  font-weight: 500;
+  opacity: 0.85;
+  margin-left: 4px;
+}
+@keyframes pop-up {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -120%);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -260%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .moment,
+  .scene-flake {
+    display: none;
+  }
+  .scene * {
+    animation: none !important;
+  }
+}
+@media print {
+  .scene,
+  .moment {
+    display: none;
+  }
 }
