@@ -818,6 +818,14 @@ describe('order form', () => {
       await as('formadmin', `update public.form_rounds set intro = 'Collect from MART' where campaign_id = $1`, [campaignId])
       expect(await look()).toBe('tees')
     })
+    it('a session that is not a Google sign-in counts as a person too, not as the SQL Editor', async () => {
+      // e.g. if email sign-in were ever switched on: no Google email, so not a super admin, and refused
+      const claims = { sub: USERS.main.sub, email: USERS.main.email, role: 'authenticated', app_metadata: { provider: 'email' } }
+      expect(await fails(db.transaction(async (tx) => {
+        await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify(claims)])
+        await tx.query(`update public.form_rounds set theme = 'hoodies' where campaign_id = $1`, [campaignId])
+      }))).toMatch(/Only MART super admins/)
+    })
     it('only known themes', async () => {
       expect(await fails(as('main', `select public.form_set_theme($1, 'neon')`, [campaignId]))).toMatch(/Unknown theme/)
       expect(await fails(db.query(`update public.form_rounds set theme = 'neon' where campaign_id = $1`, [campaignId]))).toMatch(/check constraint/)
