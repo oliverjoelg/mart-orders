@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ComponentType } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ComponentType } from 'react'
 import { useLocation } from 'react-router-dom'
 import type { SceneId, ThemeDef } from '../lib/themes'
 import { ArcadeMoment, ArcadeScene } from './scenes/arcade'
@@ -9,6 +9,9 @@ import { HackerMoment, HackerScene } from './scenes/hacker'
 import { HalloweenMoment, HalloweenScene } from './scenes/halloween'
 import { HoliMoment, HoliScene } from './scenes/holi'
 import SantaMoment from './scenes/SantaMoment'
+
+// the Retro Arcade game loads only when someone presses Play
+const NeonDefender = lazy(() => import('./scenes/neonDefender'))
 
 /**
  * A fun theme's background scene (behind the app) and its occasional "moment" (Santa's sleigh,
@@ -49,7 +52,7 @@ export default function ThemeScene({ theme, decor }: { theme: ThemeDef; decor: b
     if (Date.now() - lastScroll.current < 1500) return false
     const el = document.activeElement
     if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return false
-    if (document.querySelector('.modal, .scan-overlay')) return false
+    if (document.querySelector('.modal, .scan-overlay, .nd-overlay')) return false
     return true
   }, [])
 
@@ -87,15 +90,32 @@ export default function ThemeScene({ theme, decor }: { theme: ThemeDef; decor: b
     ;(window as unknown as { __martMoment?: () => void }).__martMoment = () => setMoment(Date.now())
   }, [])
 
+  // Neon Defender: started from the arcade moment's Play button or the theme picker
+  const [playing, setPlaying] = useState(false)
+  useEffect(() => {
+    const play = () => {
+      setMoment(0)
+      setPlaying(true)
+    }
+    window.addEventListener('mart:play-arcade', play)
+    return () => window.removeEventListener('mart:play-arcade', play)
+  }, [])
+  const game = playing ? (
+    <Suspense fallback={null}>
+      <NeonDefender onExit={() => setPlaying(false)} />
+    </Suspense>
+  ) : null
+
   const done = useCallback(() => {
     setMoment(0)
     window.dispatchEvent(new Event('mart:moment-done'))
   }, [])
 
-  if (!decor || !entry) return null
+  if (!decor || !entry) return game
   const { Scene, Moment } = entry
   return (
     <>
+      {game}
       <Scene />
       {moment > 0 && enabled && <Moment key={moment} onDone={done} />}
     </>

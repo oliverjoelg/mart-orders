@@ -50,6 +50,19 @@ export default function ThemePicker({
           )
         })}
       </div>
+      {current.id === 'arcade' && (
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{ marginTop: 14, width: '100%' }}
+          onClick={() => {
+            onClose()
+            window.dispatchEvent(new Event('mart:play-arcade'))
+          }}
+        >
+          🕹️ Play Neon Defender
+        </button>
+      )}
       <div style={{ marginTop: 14 }}>
         <Switch checked={decor} onChange={onDecor} label="Moving decorations (snow, sparkles, bats…)" />
       </div>

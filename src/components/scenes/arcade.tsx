@@ -4,7 +4,8 @@ import { bump, Pops, rand, readNumber, usePops, useTimers } from './util'
 /**
  * Retro Arcade. Scene: synthwave sun cut by stripes, neon mountains, a grid floor rolling toward
  * you, stars. Moment: a ~12 s mini-game — neon cubes rain down while your ship sweeps the bottom
- * firing lasers; tap cubes to blast them (+100), high score kept on this device.
+ * firing lasers; tap cubes to blast them (+100), high score kept on this device. Its Play button
+ * opens the full game, Neon Defender.
  * (Original artwork; not a copy of any real game.)
  */
 
@@ -114,6 +115,16 @@ export function ArcadeMoment({ onDone }: { onDone(): void }) {
         <span>SCORE {String(score).padStart(4, '0')}</span>
         <span>HI {String(Math.max(hi, score)).padStart(4, '0')}</span>
       </div>
+      <button
+        type="button"
+        className="arc-play"
+        onClick={() => {
+          window.dispatchEvent(new Event('mart:play-arcade'))
+          onDone()
+        }}
+      >
+        ▶ PLAY NEON DEFENDER
+      </button>
       {phase === 'ready' && <div className="arc-banner">PLAYER 1 READY</div>}
       {phase === 'over' && (
         <div className="arc-banner">
