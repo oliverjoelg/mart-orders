@@ -11,7 +11,13 @@ import { HoliMoment, HoliScene } from './scenes/holi'
 import SantaMoment from './scenes/SantaMoment'
 
 // the Retro Arcade game loads only when someone presses Play
-const NeonDefender = lazy(() => import('./scenes/neonDefender'))
+// If the file can't load (offline, or an old tab after a deploy that is about to reload),
+// close the game instead of taking the whole app down with it.
+function GameUnavailable({ onExit }: { onExit(): void }) {
+  useEffect(() => onExit(), [onExit])
+  return <></>
+}
+const NeonDefender = lazy(() => import('./scenes/neonDefender').catch(() => ({ default: GameUnavailable })))
 
 /**
  * A fun theme's background scene (behind the app) and its occasional "moment" (Santa's sleigh,
