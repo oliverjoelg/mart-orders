@@ -2,8 +2,12 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import type { Api } from './lib/api'
+import { watchForNewBuild } from './lib/freshBuild'
 import { applyTheme, savedTheme } from './lib/themes'
 import './styles.css'
+
+// a tab left open across a deploy reloads itself when it can't find one of the old build's files
+watchForNewBuild()
 
 // the saved theme before the first paint, so there is no flash of the default colours
 applyTheme(savedTheme(), false)
