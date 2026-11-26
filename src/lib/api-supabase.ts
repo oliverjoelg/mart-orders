@@ -1,6 +1,7 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 import { pickCampaign, type ActivityQuery, type Api, type AuthUser, type ImportArgs, type Snapshot, type UsageStats } from './api'
 import { getSupabase } from './supabase'
+import { notesForRound } from './notes'
 import type { AuditEntry, Buyer, Handover, Member, Note, OrderItem, Payment } from './types'
 
 
@@ -102,7 +103,7 @@ export function createSupabaseApi(): Api {
         }).then((r) => strip<Snapshot['handovers'][number]>(r)),
         fetchAll<Snapshot['notes'][number]>('notes'),
       ])
-      return { campaigns, products, buyers, items, handovers, notes, spare, members, roles, permissions, rolePermissions, campaignId: cid }
+      return { campaigns, products, buyers, items, handovers, notes: notesForRound(notes, items.map((i) => i.id), buyers.map((b) => b.id)), spare, members, roles, permissions, rolePermissions, campaignId: cid }
     },
 
     async loadItems(ids) {
